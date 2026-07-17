@@ -17,6 +17,9 @@ export function AppShell({
   const dictionary = getDictionary(locale);
   const nav = [
     ["dashboard", "D", dictionary.nav.dashboard],
+    ["leads", "L", dictionary.nav.leads],
+    ["customers", "C", dictionary.nav.customers],
+    ["opportunities", "O", dictionary.nav.opportunities],
     ["users", "U", dictionary.nav.users],
     ["roles", "R", dictionary.nav.roles],
   ] as const;

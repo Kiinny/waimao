@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dashboardKpis,
   loadDashboard,
   type DashboardRepository,
   type DashboardSnapshot,
@@ -9,10 +10,24 @@ import type { AuthorizationContext } from "@/lib/rbac";
 
 const snapshot: DashboardSnapshot = {
   activeCustomers: 2,
+  openLeads: 5,
+  pipelineValueUsd: "250000.00",
+  weightedForecastUsd: "112500.00",
   openQuotes: 3,
   activeOrders: 4,
   dueTasks: 1,
   recentCustomers: [],
+  salesFunnel: [],
+  monthlyOrderTrend: [],
+  leadSources: [],
+  upcomingFollowUps: [],
+  recentLeads: [],
+  recentOrders: [],
+  risks: {
+    overdueFollowUps: 2,
+    highRiskCustomers: 1,
+    staleOpportunities: 3,
+  },
 };
 
 describe("dashboard service", () => {
@@ -32,5 +47,43 @@ describe("dashboard service", () => {
 
     await expect(loadDashboard(repository, context)).resolves.toBe(snapshot);
     expect(contexts).toEqual([context]);
+  });
+});
+
+describe("dashboard KPI selection", () => {
+  it("shows sales pipeline KPIs to sales roles", () => {
+    expect(
+      dashboardKpis(
+        {
+          userId: "sales-1",
+          roles: ["SALES_REP"],
+          permissions: ["dashboard.read"],
+        },
+        snapshot,
+      ),
+    ).toEqual([
+      ["activeCustomers", 2],
+      ["openLeads", 5],
+      ["pipelineValueUsd", "250000.00"],
+      ["weightedForecastUsd", "112500.00"],
+    ]);
+  });
+
+  it("keeps operational KPIs for non-sales roles", () => {
+    expect(
+      dashboardKpis(
+        {
+          userId: "ops-1",
+          roles: ["OPERATIONS"],
+          permissions: ["dashboard.read"],
+        },
+        snapshot,
+      ),
+    ).toEqual([
+      ["activeCustomers", 2],
+      ["openQuotes", 3],
+      ["activeOrders", 4],
+      ["dueTasks", 1],
+    ]);
   });
 });

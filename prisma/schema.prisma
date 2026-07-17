@@ -232,6 +232,9 @@ model Customer {
   billingAddress  Json?
   shippingAddress Json?
   status          RecordStatus       @default(ACTIVE)
+  level           String             @default("STANDARD")
+  riskRating      String             @default("LOW")
+  riskNotes       String?
   ownerId         String             @db.Uuid
   version         Int                @default(1)
   createdAt       DateTime           @default(now())
@@ -239,6 +242,7 @@ model Customer {
   deletedAt       DateTime?
   owner           User               @relation("CustomerOwner", fields: [ownerId], references: [id])
   contacts        Contact[]
+  followUps       FollowUp[]
   opportunities   Opportunity[]
   quotes          Quote[]
   orders          SalesOrder[]
@@ -256,6 +260,9 @@ model Contact {
   title        String?
   email        String?
   phone        String?
+  whatsapp     String?
+  wechat       String?
+  preferredChannel String?
   isPrimary    Boolean   @default(false)
   language     String    @default("en")
   timezone     String?
@@ -265,6 +272,7 @@ model Contact {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
   customer     Customer  @relation(fields: [customerId], references: [id])
+  followUps    FollowUp[]
 
   @@index([customerId, deletedAt])
   @@index([email])
@@ -296,21 +304,32 @@ model Lead {
 
 model FollowUp {
   id            String       @id @default(uuid()) @db.Uuid
+  customerId    String?      @db.Uuid
+  contactId     String?      @db.Uuid
   leadId        String?      @db.Uuid
   opportunityId String?      @db.Uuid
   type          String
+  channel       String
   summary       String
+  outcome       String?
+  nextAction    String?
   occurredAt    DateTime
   nextActionAt  DateTime?
+  completedAt   DateTime?
+  attachments   Json?
   createdById   String       @db.Uuid
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   deletedAt     DateTime?
+  customer      Customer?    @relation(fields: [customerId], references: [id])
+  contact       Contact?     @relation(fields: [contactId], references: [id])
   lead          Lead?        @relation(fields: [leadId], references: [id])
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
 
   @@index([leadId, occurredAt])
   @@index([opportunityId, occurredAt])
+  @@index([customerId, occurredAt])
+  @@index([contactId, occurredAt])
   @@index([nextActionAt])
 }
 
@@ -325,6 +344,9 @@ model Opportunity {
   valueUsd          Decimal          @db.Decimal(19, 4)
   probability       Int              @default(10)
   expectedCloseAt   DateTime?
+  lostReason        String?
+  wonAt             DateTime?
+  lostAt            DateTime?
   ownerId           String           @db.Uuid
   version           Int              @default(1)
   createdAt         DateTime         @default(now())
