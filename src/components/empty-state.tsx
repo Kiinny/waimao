@@ -8,7 +8,7 @@ export function EmptyState({
   return (
     <div className="empty-state">
       <div>
-        <div style={{ fontSize: 32, marginBottom: 10 }}>◇</div>
+        <div style={{ fontSize: 24, marginBottom: 10 }}>--</div>
         <strong>{title}</strong>
         {description ? <p className="muted">{description}</p> : null}
       </div>

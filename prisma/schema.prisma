@@ -135,6 +135,7 @@ model User {
   createdTasks       Task[]              @relation("TaskCreator")
   notifications      Notification[]
   uploadedFiles      FileAsset[]         @relation("FileUploader")
+  purchaseOverrides  SalesOrder[]        @relation("OrderPurchaseOverrideActor")
 
   @@index([status, deletedAt])
 }
@@ -202,17 +203,18 @@ model LoginAttempt {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String?  @db.Uuid
-  action     String
-  entityType String
-  entityId   String?
-  before     Json?
-  after      Json?
-  metadata   Json?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
-  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  id                    String      @id @default(uuid()) @db.Uuid
+  actorId               String?     @db.Uuid
+  action                String
+  entityType            String
+  entityId              String?
+  before                Json?
+  after                 Json?
+  metadata              Json?
+  ipAddress             String?
+  createdAt             DateTime    @default(now())
+  actor                 User?       @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  purchaseOverrideOrder SalesOrder? @relation("OrderPurchaseOverrideAudit")
 
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
@@ -450,7 +452,7 @@ model QuoteItem {
   discount         Decimal      @default(0) @db.Decimal(19, 4)
   lineTotal        Decimal      @db.Decimal(19, 4)
   estimatedCostUsd Decimal?     @db.Decimal(19, 4)
-  quoteVersion     QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Cascade)
+  quoteVersion     QuoteVersion @relation(fields: [quoteVersionId], references: [id], onDelete: Restrict)
   product          Product?     @relation(fields: [productId], references: [id])
 
   @@index([quoteVersionId])
@@ -458,36 +460,41 @@ model QuoteItem {
 }
 
 model SalesOrder {
-  id                     String             @id @default(uuid()) @db.Uuid
-  orderNumber            String             @unique
-  customerId             String             @db.Uuid
-  quoteId                String?            @unique @db.Uuid
-  ownerId                String             @db.Uuid
-  status                 OrderStatus        @default(DRAFT)
-  currencyCode           String
-  exchangeRateToUsd      Decimal            @db.Decimal(24, 12)
-  total                  Decimal            @db.Decimal(19, 4)
-  totalUsd               Decimal            @db.Decimal(19, 4)
-  paymentTerms           String
-  purchaseOverrideReason String?
-  purchaseOverriddenAt   DateTime?
-  version                Int                @default(1)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  deletedAt              DateTime?
-  customer               Customer           @relation(fields: [customerId], references: [id])
-  quote                  Quote?             @relation(fields: [quoteId], references: [id])
-  owner                  User               @relation("OrderOwner", fields: [ownerId], references: [id])
-  items                  SalesOrderItem[]
-  payments               Payment[]
-  refunds                Refund[]
-  costs                  Cost[]
-  purchaseOrders         PurchaseOrder[]
-  shipments              Shipment[]
-  tickets                AfterSalesTicket[]
+  id                      String             @id @default(uuid()) @db.Uuid
+  orderNumber             String             @unique
+  customerId              String             @db.Uuid
+  quoteId                 String?            @unique @db.Uuid
+  ownerId                 String             @db.Uuid
+  status                  OrderStatus        @default(DRAFT)
+  currencyCode            String
+  exchangeRateToUsd       Decimal            @db.Decimal(24, 12)
+  total                   Decimal            @db.Decimal(19, 4)
+  totalUsd                Decimal            @db.Decimal(19, 4)
+  paymentTerms            String
+  purchaseOverrideReason  String?
+  purchaseOverrideActorId String?            @db.Uuid
+  purchaseOverrideAuditId String?            @unique @db.Uuid
+  purchaseOverriddenAt    DateTime?
+  version                 Int                @default(1)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  deletedAt               DateTime?
+  customer                Customer           @relation(fields: [customerId], references: [id])
+  quote                   Quote?             @relation(fields: [quoteId], references: [id])
+  owner                   User               @relation("OrderOwner", fields: [ownerId], references: [id])
+  purchaseOverrideActor   User?              @relation("OrderPurchaseOverrideActor", fields: [purchaseOverrideActorId], references: [id], onDelete: Restrict)
+  purchaseOverrideAudit   AuditLog?          @relation("OrderPurchaseOverrideAudit", fields: [purchaseOverrideAuditId], references: [id], onDelete: Restrict)
+  items                   SalesOrderItem[]
+  payments                Payment[]
+  refunds                 Refund[]
+  costs                   Cost[]
+  purchaseOrders          PurchaseOrder[]
+  shipments               Shipment[]
+  tickets                 AfterSalesTicket[]
 
   @@index([ownerId, status, deletedAt])
   @@index([customerId])
+  @@index([purchaseOverrideActorId])
 }
 
 model SalesOrderItem {

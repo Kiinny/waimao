@@ -54,3 +54,73 @@ pnpm build
 - User and role foundations currently expose list/create operations only. Later management work can add update/deactivation flows while reusing the transaction-scoped audit pattern.
 - The generated Prisma client is intentionally ignored and must be produced with `pnpm prisma:generate` after install; the README and Docker build both do this.
 - The task brief and progress ledger were not modified.
+
+## Review fixes
+
+### Status
+
+`DONE_WITH_CONCERNS`
+
+### Fixes delivered
+
+- Replaced non-ASCII source literals in dictionaries and shell controls with stable Unicode escapes or ASCII, corrected the login/shell language switches, and localized dashboard, user and role headings/tables in English and Chinese.
+- Replaced JWT permission trust with a live server authorization context. Every protected page and API request now reloads the user, rejects inactive/locked/soft-deleted users, excludes soft-deleted roles, and rebuilds current permissions. Role and permission claims are no longer copied into the JWT-backed session.
+- Added exact role-permission validation. Duplicate and unknown codes now produce structured `VALIDATION_ERROR` responses rather than being silently deduplicated or ignored.
+- Converted top search to a real accessible GET search flow over permission-visible customers, sales orders and quotations. The notification control now navigates to a labeled, focusable dashboard notification/risk section with live overdue-task data.
+- Added tested quote-version immutability at the service and PATCH API boundary. Sent-or-later quote versions and versions with `immutableAt` reject mutation.
+- Added a tested `100% T/T Before Purchase` payment/refund gate and POST transition API. Only super-admin wildcard access can supply a nonempty override reason; the transaction records the override actor, reason, time and immutable audit-log relation.
+- Added a follow-up migration and schema relations for override actor/audit metadata. Quote items now use `ON DELETE RESTRICT` rather than destructive cascade from immutable quote versions.
+
+### Red/green and final verification
+
+- Focused review-fix tests:
+
+  ```powershell
+  pnpm test src/i18n/dictionaries.test.ts src/modules/auth/authorization-context.test.ts src/modules/roles/role-permissions.test.ts src/modules/quotes/quote-service.test.ts src/modules/orders/purchase-gate.test.ts
+  ```
+
+  Result: PASS — 5 test files, 23 tests, 0 failures.
+
+- Full unit suite:
+
+  ```powershell
+  pnpm test
+  ```
+
+  Result: PASS — 10 test files, 43 tests, 0 failures.
+
+- Prisma schema:
+
+  ```powershell
+  node node_modules\prisma\build\index.js validate
+  ```
+
+  Result: PASS — `The schema at prisma\schema.prisma is valid`.
+
+- TypeScript:
+
+  ```powershell
+  pnpm typecheck
+  ```
+
+  Result: PASS — `tsc --noEmit`, exit code 0.
+
+- ESLint:
+
+  ```powershell
+  pnpm lint
+  ```
+
+  Result: PASS — exit code 0 with no warnings/errors.
+
+- Production build:
+
+  ```powershell
+  pnpm build
+  ```
+
+  Result: PASS — Next.js 16.2.10 compiled, typechecked and generated all 16 route entries, including search, quote-version update and purchase-transition boundaries.
+
+### Remaining concern
+
+- Docker/Compose execution remains unverified because the Docker CLI is unavailable in this environment.

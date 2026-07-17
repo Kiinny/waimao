@@ -163,6 +163,15 @@ a {
   color: var(--foreground);
 }
 
+.search button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .top-actions {
   display: flex;
   align-items: center;

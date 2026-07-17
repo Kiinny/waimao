@@ -5,6 +5,7 @@ import { currentAuthorizationContext } from "@/lib/current-user";
 import { failure, success } from "@/lib/http";
 import { getPrisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
+import { resolvePermissionIds } from "@/modules/roles/role-permissions";
 
 const createRoleSchema = z.object({
   code: z
@@ -43,15 +44,19 @@ export async function POST(request: Request) {
     const role = await getPrisma().$transaction(async (transaction) => {
       const permissions = await transaction.permission.findMany({
         where: { code: { in: input.permissions } },
-        select: { id: true },
+        select: { id: true, code: true },
       });
+      const permissionIds = resolvePermissionIds(
+        input.permissions,
+        permissions,
+      );
       const created = await transaction.role.create({
         data: {
           code: input.code,
           name: input.name,
           description: input.description,
           permissions: {
-            create: permissions.map(({ id }) => ({ permissionId: id })),
+            create: permissionIds.map((permissionId) => ({ permissionId })),
           },
         },
         select: { id: true, code: true, name: true, description: true },

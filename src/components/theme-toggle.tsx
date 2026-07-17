@@ -24,7 +24,7 @@ export function ThemeToggle() {
       aria-label="Toggle color theme"
       onClick={toggleTheme}
     >
-      ◐
+      T
     </button>
   );
 }

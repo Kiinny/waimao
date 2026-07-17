@@ -1,22 +1,24 @@
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
+
 import { EmptyState } from "@/components/empty-state";
+import { getDictionary, isLocale } from "@/i18n/dictionaries";
+import { currentAuthorizationContext } from "@/lib/current-user";
 import { getPrisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-export default async function RolesPage() {
-  const session = await auth();
-  if (
-    !can(
-      {
-        userId: session!.user.id,
-        permissions: session!.user.permissions,
-      },
-      "role.read",
-    )
-  ) {
-    return <EmptyState title="You do not have access to role management." />;
+export default async function RolesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  if (!isLocale(locale)) notFound();
+  const dictionary = getDictionary(locale);
+  const context = await currentAuthorizationContext();
+  if (!can(context, "role.read")) {
+    return <EmptyState title={dictionary.roles.denied} />;
   }
   const roles = await getPrisma().role.findMany({
     where: { deletedAt: null },
@@ -28,8 +30,8 @@ export default async function RolesPage() {
     <>
       <header className="page-heading">
         <div>
-          <h1>Roles</h1>
-          <p>System responsibilities and permission coverage.</p>
+          <h1>{dictionary.roles.title}</h1>
+          <p>{dictionary.roles.subtitle}</p>
         </div>
       </header>
       <section className="card section-card">
@@ -37,10 +39,10 @@ export default async function RolesPage() {
           <table>
             <thead>
               <tr>
-                <th>Role</th>
-                <th>Code</th>
-                <th>Users</th>
-                <th>Permissions</th>
+                <th>{dictionary.roles.table.role}</th>
+                <th>{dictionary.roles.table.code}</th>
+                <th>{dictionary.roles.table.users}</th>
+                <th>{dictionary.roles.table.permissions}</th>
               </tr>
             </thead>
             <tbody>

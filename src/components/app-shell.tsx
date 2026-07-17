@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 import { signOut } from "@/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Locale } from "@/i18n/dictionaries";
 import { getDictionary } from "@/i18n/dictionaries";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AppShell({
   locale,
@@ -16,10 +16,12 @@ export function AppShell({
 }) {
   const dictionary = getDictionary(locale);
   const nav = [
-    ["dashboard", "⌂", dictionary.nav.dashboard],
-    ["users", "♙", dictionary.nav.users],
-    ["roles", "⌘", dictionary.nav.roles],
+    ["dashboard", "D", dictionary.nav.dashboard],
+    ["users", "U", dictionary.nav.users],
+    ["roles", "R", dictionary.nav.roles],
   ] as const;
+  const targetLocale = locale === "en" ? "zh" : "en";
+  const targetDictionary = getDictionary(targetLocale);
 
   async function logout() {
     "use server";
@@ -49,28 +51,35 @@ export function AppShell({
       </aside>
       <div className="app-main">
         <header className="topbar">
-          <label className="search">
-            <span aria-hidden="true">⌕</span>
+          <form
+            className="search"
+            action={`/${locale}/search`}
+            role="search"
+          >
+            <span aria-hidden="true">S</span>
             <input
-              aria-label={dictionary.search}
-              placeholder={dictionary.search}
+              aria-label={dictionary.search.label}
+              placeholder={dictionary.search.placeholder}
+              name="q"
               type="search"
+              required
             />
-          </label>
+            <button type="submit">{dictionary.search.submit}</button>
+          </form>
           <div className="top-actions">
             <Link
               className="icon-button notification-link"
               href={`/${locale}/dashboard#notifications`}
-              aria-label="Notifications"
+              aria-label={dictionary.notificationsLabel}
             >
-              ♢
+              !
             </Link>
             <Link
               className="icon-button"
-              href={`/${locale === "en" ? "zh" : "en"}/dashboard`}
-              aria-label="Switch language"
+              href={`/${targetLocale}/dashboard`}
+              aria-label={dictionary.languageSwitch}
             >
-              {locale === "en" ? "中" : "EN"}
+              {targetDictionary.languageName}
             </Link>
             <ThemeToggle />
             <form action={logout}>

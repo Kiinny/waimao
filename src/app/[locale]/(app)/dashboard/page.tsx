@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { EmptyState } from "@/components/empty-state";
 import { getDictionary, isLocale } from "@/i18n/dictionaries";
+import { currentAuthorizationContext } from "@/lib/current-user";
 import { loadDashboard } from "@/modules/dashboard/dashboard-service";
 import { PrismaDashboardRepository } from "@/modules/dashboard/prisma-dashboard-repository";
 
@@ -16,10 +17,11 @@ export default async function DashboardPage({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const session = await auth();
+  const context = await currentAuthorizationContext();
   const dictionary = getDictionary(locale);
   const snapshot = await loadDashboard(
     new PrismaDashboardRepository(),
-    session!.user.id,
+    context.userId,
   );
   const metrics = [
     [dictionary.dashboard.customers, snapshot.activeCustomers],
@@ -54,9 +56,9 @@ export default async function DashboardPage({
             <table>
               <thead>
                 <tr>
-                  <th>Company</th>
-                  <th>Country</th>
-                  <th>Added</th>
+                  <th>{dictionary.dashboard.table.company}</th>
+                  <th>{dictionary.dashboard.table.country}</th>
+                  <th>{dictionary.dashboard.table.added}</th>
                 </tr>
               </thead>
               <tbody>
@@ -74,7 +76,21 @@ export default async function DashboardPage({
           <EmptyState title={dictionary.dashboard.empty} />
         )}
       </section>
-      <section id="notifications" aria-label="Notifications" />
+      <section
+        className="card section-card"
+        id="notifications"
+        aria-labelledby="notifications-title"
+        tabIndex={-1}
+      >
+        <h2 className="section-title" id="notifications-title">
+          {dictionary.dashboard.risks.title}
+        </h2>
+        <p className="muted">
+          {snapshot.dueTasks
+            ? `${snapshot.dueTasks} ${dictionary.dashboard.risks.overdueTasks}`
+            : dictionary.dashboard.risks.clear}
+        </p>
+      </section>
     </>
   );
 }

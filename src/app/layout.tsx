@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: {
     default: "Atlas CRM",
-    template: "%s · Atlas CRM",
+    template: "%s \u00b7 Atlas CRM",
   },
   description: "Foreign-trade operations, from first contact to delivery.",
 };

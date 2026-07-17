@@ -1,22 +1,24 @@
-import { auth } from "@/auth";
+import { notFound } from "next/navigation";
+
 import { EmptyState } from "@/components/empty-state";
+import { getDictionary, isLocale } from "@/i18n/dictionaries";
+import { currentAuthorizationContext } from "@/lib/current-user";
 import { getPrisma } from "@/lib/prisma";
 import { can } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-export default async function UsersPage() {
-  const session = await auth();
-  if (
-    !can(
-      {
-        userId: session!.user.id,
-        permissions: session!.user.permissions,
-      },
-      "user.read",
-    )
-  ) {
-    return <EmptyState title="You do not have access to user management." />;
+export default async function UsersPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  if (!isLocale(locale)) notFound();
+  const dictionary = getDictionary(locale);
+  const context = await currentAuthorizationContext();
+  if (!can(context, "user.read")) {
+    return <EmptyState title={dictionary.users.denied} />;
   }
 
   const users = await getPrisma().user.findMany({
@@ -26,7 +28,10 @@ export default async function UsersPage() {
       name: true,
       email: true,
       status: true,
-      roles: { select: { role: { select: { name: true } } } },
+      roles: {
+        where: { role: { deletedAt: null } },
+        select: { role: { select: { name: true } } },
+      },
     },
     orderBy: { name: "asc" },
   });
@@ -35,8 +40,8 @@ export default async function UsersPage() {
     <>
       <header className="page-heading">
         <div>
-          <h1>Users</h1>
-          <p>Accounts, access status and assigned roles.</p>
+          <h1>{dictionary.users.title}</h1>
+          <p>{dictionary.users.subtitle}</p>
         </div>
       </header>
       <section className="card section-card">
@@ -45,10 +50,10 @@ export default async function UsersPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
+                  <th>{dictionary.users.table.name}</th>
+                  <th>{dictionary.users.table.email}</th>
+                  <th>{dictionary.users.table.role}</th>
+                  <th>{dictionary.users.table.status}</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,7 +71,7 @@ export default async function UsersPage() {
             </table>
           </div>
         ) : (
-          <EmptyState title="No users found." />
+          <EmptyState title={dictionary.users.empty} />
         )}
       </section>
     </>

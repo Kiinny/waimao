@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 
 export default auth((request) => {
   const pathname = request.nextUrl.pathname;
-  const isProtected = /^\/(en|zh)\/(dashboard|users|roles)/.test(pathname);
+  const isProtected = /^\/(en|zh)\/(dashboard|users|roles|search)/.test(pathname);
 
   if (isProtected && !request.auth) {
     const locale = pathname.split("/")[1] || "en";

@@ -63,7 +63,7 @@ export default async function LoginPage({
           </button>
           <p className="muted" style={{ marginTop: 22, fontSize: 13 }}>
             <Link href={`/${locale === "en" ? "zh" : "en"}/login`}>
-              {locale === "en" ? "中文" : "English"}
+              {getDictionary(locale === "en" ? "zh" : "en").languageName}
             </Link>
           </p>
         </form>

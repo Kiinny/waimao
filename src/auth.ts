@@ -50,17 +50,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     authorized({ auth: session }) {
       return Boolean(session?.user);
     },
-    jwt({ token, user }) {
-      if (user) {
-        token.roles = user.roles;
-        token.permissions = user.permissions;
-      }
+    jwt({ token }) {
       return token;
     },
     session({ session, token }) {
       session.user.id = token.sub ?? "";
-      session.user.roles = (token.roles as string[]) ?? [];
-      session.user.permissions = (token.permissions as string[]) ?? [];
       return session;
     },
   },

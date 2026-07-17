@@ -14,6 +14,7 @@ export function createPrismaAuthRepository(): AuthRepository {
         where: { email, deletedAt: null },
         include: {
           roles: {
+            where: { role: { deletedAt: null } },
             include: {
               role: {
                 include: {
