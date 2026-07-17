@@ -1,20 +1,34 @@
 import Decimal from "decimal.js";
 
 import { getPrisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/rbac";
 import type {
   DashboardRepository,
   DashboardSnapshot,
 } from "@/modules/dashboard/dashboard-service";
-import { dashboardOwnershipFilter } from "@/modules/dashboard/dashboard-scope";
+import {
+  dashboardAccessScope,
+  dashboardOwnershipFilter,
+} from "@/modules/dashboard/dashboard-scope";
 import { weightedForecast } from "@/modules/crm/crm-domain";
 
 export class PrismaDashboardRepository implements DashboardRepository {
   async loadSnapshot(context: Parameters<DashboardRepository["loadSnapshot"]>[0]): Promise<DashboardSnapshot> {
+    requirePermission(context, "dashboard.read");
     const prisma = getPrisma();
+    const access = dashboardAccessScope(context);
     const ownership = dashboardOwnershipFilter(context);
-    const ownerId = dashboardOwnershipFilter(context).ownerId;
-    const followUpScope = ownerId
-      ? {
+    const ownerId = access.domain === "sales" ? access.ownerId : undefined;
+    const noSalesRows = { id: "00000000-0000-0000-0000-000000000000" };
+    const salesOwnership =
+      access.domain === "sales" ? ownership : noSalesRows;
+    const orderOwnership =
+      access.domain === "sales" ? ownership : {};
+    const followUpScope =
+      access.domain === "operations"
+        ? noSalesRows
+        : ownerId
+          ? {
           OR: [
             { customer: { ownerId } },
             { contact: { customer: { ownerId } } },
@@ -22,7 +36,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
             { opportunity: { ownerId } },
           ],
         }
-      : {};
+          : {};
     const now = new Date();
     const twelveMonthsAgo = new Date(now);
     twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 11, 1);
@@ -48,27 +62,27 @@ export class PrismaDashboardRepository implements DashboardRepository {
     ] =
       await prisma.$transaction([
         prisma.customer.count({
-          where: { status: "ACTIVE", deletedAt: null, ...ownership },
+          where: { status: "ACTIVE", deletedAt: null, ...salesOwnership },
         }),
         prisma.lead.count({
           where: {
             status: { in: ["NEW", "CONTACTED", "QUALIFIED"] },
             deletedAt: null,
-            ...ownership,
+            ...salesOwnership,
           },
         }),
         prisma.quote.count({
           where: {
             status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED", "SENT"] },
             deletedAt: null,
-            ...ownership,
+            ...salesOwnership,
           },
         }),
         prisma.salesOrder.count({
           where: {
             status: { in: ["CONFIRMED", "PURCHASING", "FULFILLING", "SHIPPED"] },
             deletedAt: null,
-            ...ownership,
+            ...orderOwnership,
           },
         }),
         prisma.task.count({
@@ -80,7 +94,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
           },
         }),
         prisma.customer.findMany({
-          where: { deletedAt: null, ...ownership },
+          where: { deletedAt: null, ...salesOwnership },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: {
@@ -92,7 +106,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
         }),
         prisma.opportunity.groupBy({
           by: ["stage"],
-          where: { deletedAt: null, ...ownership },
+          where: { deletedAt: null, ...salesOwnership },
           orderBy: { stage: "asc" },
           _count: { id: true },
           _sum: { valueUsd: true },
@@ -101,13 +115,13 @@ export class PrismaDashboardRepository implements DashboardRepository {
           where: {
             deletedAt: null,
             stage: { not: "LOST" },
-            ...ownership,
+            ...salesOwnership,
           },
           select: { valueUsd: true, probability: true, stage: true },
         }),
         prisma.lead.groupBy({
           by: ["source"],
-          where: { deletedAt: null, ...ownership },
+          where: { deletedAt: null, ...salesOwnership },
           _count: { id: true },
           orderBy: { _count: { source: "desc" } },
           take: 8,
@@ -128,13 +142,13 @@ export class PrismaDashboardRepository implements DashboardRepository {
           },
         }),
         prisma.lead.findMany({
-          where: { deletedAt: null, ...ownership },
+          where: { deletedAt: null, ...salesOwnership },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: { id: true, companyName: true, status: true, createdAt: true },
         }),
         prisma.salesOrder.findMany({
-          where: { deletedAt: null, ...ownership },
+          where: { deletedAt: null, ...orderOwnership },
           orderBy: { createdAt: "desc" },
           take: 5,
           select: {
@@ -149,7 +163,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
           where: {
             deletedAt: null,
             createdAt: { gte: twelveMonthsAgo },
-            ...ownership,
+            ...orderOwnership,
           },
           select: { createdAt: true, totalUsd: true },
         }),
@@ -165,7 +179,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
           where: {
             deletedAt: null,
             riskRating: "HIGH",
-            ...ownership,
+            ...salesOwnership,
           },
         }),
         prisma.opportunity.count({
@@ -173,7 +187,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
             deletedAt: null,
             stage: { notIn: ["WON", "LOST"] },
             updatedAt: { lt: staleBefore },
-            ...ownership,
+            ...salesOwnership,
           },
         }),
       ]);

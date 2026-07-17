@@ -19,6 +19,7 @@ function repositoryFixture(
   return {
     findLead: async () => ({
       id: "lead-1",
+      version: 1,
       ownerId: "sales-1",
       status: "QUALIFIED",
       companyName: "Northstar Systems",
@@ -37,6 +38,7 @@ function repositoryFixture(
       id: "opportunity-1",
       ownerId: "sales-1",
       stage: "DISCOVERY",
+      version: 3,
     }),
     updateOpportunityStage: async (_context, opportunity, input) => ({
       id: opportunity.id,
@@ -85,6 +87,7 @@ describe("lead conversion", () => {
     const foreign = repositoryFixture({
       findLead: async () => ({
         id: "lead-1",
+        version: 1,
         ownerId: "sales-2",
         status: "QUALIFIED",
         companyName: "Northstar Systems",
@@ -113,6 +116,7 @@ describe("lead conversion", () => {
     const convertedLead = repositoryFixture({
       findLead: async () => ({
         id: "lead-1",
+        version: 2,
         ownerId: "sales-1",
         status: "CONVERTED",
         companyName: "Northstar Systems",
@@ -168,5 +172,26 @@ describe("opportunity movement", () => {
       ),
     ).rejects.toThrow(/loss reason/i);
     expect(persisted).toBe(false);
+  });
+
+  it("passes the read version to the guarded stage update", async () => {
+    const seenVersions: number[] = [];
+    const repository = repositoryFixture({
+      updateOpportunityStage: async (_context, opportunity, input) => {
+        seenVersions.push(opportunity.version);
+        return {
+          id: opportunity.id,
+          stage: input.stage,
+          lossReason: input.lossReason ?? null,
+        };
+      },
+    });
+    await moveOpportunity(
+      repository,
+      representative,
+      "opportunity-1",
+      "PROPOSAL",
+    );
+    expect(seenVersions).toEqual([3]);
   });
 });

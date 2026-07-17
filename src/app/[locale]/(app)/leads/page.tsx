@@ -26,6 +26,7 @@ export default async function LeadsPage({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const dictionary = getDictionary(locale);
+  const crm = dictionary.crm;
   const context = await currentAuthorizationContext();
   requirePermission(context, "lead.read");
   const query = await searchParams;
@@ -62,29 +63,47 @@ export default async function LeadsPage({
       </header>
 
       <form className="card filter-bar" method="get">
-        <input defaultValue={filters.query} name="query" placeholder="Company, contact, email, phone" />
-        <input defaultValue={filters.countryCode} maxLength={2} name="countryCode" placeholder="Country" />
-        <input defaultValue={filters.source} name="source" placeholder="Source" />
+        <input defaultValue={filters.query} name="query" placeholder={crm.fields.companySearch} />
+        <input defaultValue={filters.countryCode} maxLength={2} name="countryCode" placeholder={crm.fields.country} />
+        <input defaultValue={filters.source} name="source" placeholder={crm.fields.source} />
         <select defaultValue={filters.status ?? ""} name="status">
-          <option value="">All statuses</option>
-          <option value="NEW">New</option>
-          <option value="CONTACTED">Contacted</option>
-          <option value="QUALIFIED">Qualified</option>
-          <option value="CONVERTED">Converted</option>
-          <option value="LOST">Lost</option>
+          <option value="">{crm.options.allStatuses}</option>
+          {["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"].map((status) => (
+            <option key={status} value={status}>{crm.statuses[status as keyof typeof crm.statuses]}</option>
+          ))}
         </select>
-        <input defaultValue={value(query.createdFrom)} name="createdFrom" type="date" />
-        <input defaultValue={value(query.createdTo)} name="createdTo" type="date" />
+        <input aria-label={crm.fields.createdFrom} defaultValue={value(query.createdFrom)} name="createdFrom" type="date" />
+        <input aria-label={crm.fields.createdTo} defaultValue={value(query.createdTo)} name="createdTo" type="date" />
         <button className="button" type="submit">{dictionary.crm.search}</button>
       </form>
 
       <section className="card section-card">
         <div className="section-heading">
-          <h2 className="section-title">{result.total} leads</h2>
-          <span>Page {result.page} / {Math.max(1, result.pageCount)}</span>
+          <h2 className="section-title">{crm.pagination.leadCount.replace("{count}", String(result.total))}</h2>
+          <span>{crm.pagination.page.replace("{page}", String(result.page)).replace("{total}", String(Math.max(1, result.pageCount)))}</span>
         </div>
         <LeadTable
           emptyText={dictionary.crm.empty}
+          canAssign={context.roles?.some((role) => ["SALES_MANAGER", "SUPER_ADMIN"].includes(role)) === true}
+          labels={{
+            selected: crm.feedback.selected,
+            confirmBatch: crm.feedback.confirmBatch,
+            updating: crm.feedback.updating,
+            applyStatus: crm.actions.applyStatus,
+            assignOwner: crm.actions.assignOwner,
+            selectOwner: crm.options.selectOwner,
+            batchUpdated: crm.feedback.batchUpdated,
+            batchFailed: crm.feedback.batchFailed,
+            select: crm.options.none,
+            company: crm.fields.company,
+            contact: crm.fields.contact,
+            country: crm.fields.country,
+            source: crm.fields.source,
+            status: crm.fields.status,
+            owner: crm.fields.owner,
+            added: crm.fields.added,
+            statuses: crm.statuses,
+          }}
           leads={result.items.map((lead) => ({
             id: lead.id,
             companyName: lead.companyName,
@@ -92,14 +111,15 @@ export default async function LeadsPage({
             countryCode: lead.countryCode,
             source: lead.source,
             status: lead.status,
+            ownerId: lead.owner.id,
             ownerName: lead.owner.name,
             createdAt: lead.createdAt.toISOString(),
           }))}
           locale={locale}
         />
         <div className="pagination">
-          {result.page > 1 ? <Link href={`?${new URLSearchParams({ ...Object.fromEntries(exportQuery), page: String(result.page - 1) })}`}>Previous</Link> : <span />}
-          {result.page < result.pageCount ? <Link href={`?${new URLSearchParams({ ...Object.fromEntries(exportQuery), page: String(result.page + 1) })}`}>Next</Link> : null}
+          {result.page > 1 ? <Link href={`?${new URLSearchParams({ ...Object.fromEntries(exportQuery), page: String(result.page - 1) })}`}>{crm.pagination.previous}</Link> : <span />}
+          {result.page < result.pageCount ? <Link href={`?${new URLSearchParams({ ...Object.fromEntries(exportQuery), page: String(result.page + 1) })}`}>{crm.pagination.next}</Link> : null}
         </div>
       </section>
 
@@ -113,18 +133,28 @@ export default async function LeadsPage({
             submitLabel={dictionary.crm.create}
             successMessage={dictionary.crm.success}
           >
-            <label>Company<input name="companyName" required /></label>
-            <label>Contact<input name="contactName" required /></label>
-            <label>Email<input name="email" type="email" /></label>
-            <label>Phone<input name="phone" /></label>
-            <label>Country<input maxLength={2} name="countryCode" required /></label>
-            <label>Source<input name="source" required /></label>
-            <label>Notes<textarea name="notes" rows={3} /></label>
+            <label>{crm.fields.company}<input name="companyName" required /></label>
+            <label>{crm.fields.contact}<input name="contactName" required /></label>
+            <label>{crm.fields.email}<input name="email" type="email" /></label>
+            <label>{crm.fields.phone}<input name="phone" /></label>
+            <label>{crm.fields.country}<input maxLength={2} name="countryCode" required /></label>
+            <label>{crm.fields.source}<input name="source" required /></label>
+            <label>{crm.fields.notes}<textarea name="notes" rows={3} /></label>
           </ApiMutationForm>
         </details>
         <details className="card section-card">
           <summary>{dictionary.crm.leads.import}</summary>
-          <LeadCsvImport />
+          <LeadCsvImport labels={{
+            label: crm.csv.label,
+            placeholder: crm.csv.placeholder,
+            checking: crm.actions.checking,
+            preview: crm.actions.preview,
+            commit: crm.actions.commit,
+            imported: crm.feedback.imported,
+            importFailed: crm.feedback.importFailed,
+            validRows: crm.feedback.validRows,
+            rowError: crm.feedback.rowError,
+          }} />
         </details>
       </div>
     </>

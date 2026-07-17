@@ -6,9 +6,14 @@ import { writeAudit } from "@/lib/audit";
 import { DomainError } from "@/lib/errors";
 import type { AuthorizationContext } from "@/lib/rbac";
 import {
+  assertLeadMutable,
   assertPrimaryContactChange,
   crmOwnerWhere,
+  customerTimelineWhere,
   findLeadDuplicates,
+  followUpRelationMetadata,
+  opportunityStageGuard,
+  resolveOpportunityOwner,
 } from "@/modules/crm/crm-domain";
 import type {
   AtomicConversionInput,
@@ -116,7 +121,7 @@ export interface CreateOpportunityData {
   exchangeRateToUsd: string;
   probability: number;
   expectedCloseAt?: Date | null;
-  ownerId: string;
+  ownerId?: string;
 }
 
 function ownerIdFor(context: AuthorizationContext) {
@@ -210,6 +215,7 @@ export class PrismaCrmRepository implements CrmRepository {
       where: { id, deletedAt: null, ...ownershipWhere(context) },
       select: {
         id: true,
+        version: true,
         ownerId: true,
         status: true,
         companyName: true,
@@ -307,11 +313,20 @@ export class PrismaCrmRepository implements CrmRepository {
   ) {
     const existing = await this.findLead(context, id);
     if (!existing) throw new DomainError("LEAD_NOT_FOUND", "Lead not found", 404);
+    assertLeadMutable(existing.status);
     return getPrisma().$transaction(async (transaction) => {
-      const lead = await transaction.lead.update({
-        where: { id },
+      const result = await transaction.lead.updateMany({
+        where: { id, deletedAt: null, status: { not: "CONVERTED" } },
         data: { ...input, version: { increment: 1 } },
       });
+      if (result.count !== 1) {
+        throw new DomainError(
+          "LEAD_ALREADY_CONVERTED",
+          "Converted leads are immutable",
+          409,
+        );
+      }
+      const lead = await transaction.lead.findUniqueOrThrow({ where: { id } });
       await writeAudit(transaction, {
         actorId: context.userId,
         action: "lead.update",
@@ -332,24 +347,32 @@ export class PrismaCrmRepository implements CrmRepository {
     const prisma = getPrisma();
     const scoped = await prisma.lead.findMany({
       where: { id: { in: ids }, deletedAt: null, ...ownershipWhere(context) },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (scoped.length !== new Set(ids).size) {
       throw new DomainError("LEAD_NOT_FOUND", "One or more leads were not found", 404);
     }
+    scoped.forEach((lead) => assertLeadMutable(lead.status));
     const ownId = ownerIdFor(context);
     if (input.ownerId && ownId) {
       throw new DomainError("PERMISSION_DENIED", "Permission denied: lead.assign", 403);
     }
     return prisma.$transaction(async (transaction) => {
       const result = await transaction.lead.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, status: { not: "CONVERTED" } },
         data: {
           ...(input.ownerId ? { ownerId: input.ownerId } : {}),
           ...(input.status ? { status: input.status } : {}),
           version: { increment: 1 },
         },
       });
+      if (result.count !== scoped.length) {
+        throw new DomainError(
+          "LEAD_ALREADY_CONVERTED",
+          "Converted leads are immutable",
+          409,
+        );
+      }
       await writeAudit(transaction, {
         actorId: context.userId,
         action: "lead.batch_update",
@@ -375,6 +398,23 @@ export class PrismaCrmRepository implements CrmRepository {
         },
       });
       if (!current) {
+        throw new DomainError(
+          "LEAD_CONVERSION_CONFLICT",
+          "Lead cannot be converted",
+          409,
+        );
+      }
+      const claimed = await transaction.lead.updateMany({
+        where: {
+          id: current.id,
+          status: { not: "CONVERTED" },
+          convertedCustomerId: null,
+          convertedOpportunityId: null,
+          version: current.version,
+        },
+        data: { status: "CONVERTED", version: { increment: 1 } },
+      });
+      if (claimed.count !== 1) {
         throw new DomainError(
           "LEAD_CONVERSION_CONFLICT",
           "Lead cannot be converted",
@@ -417,10 +457,8 @@ export class PrismaCrmRepository implements CrmRepository {
       await transaction.lead.update({
         where: { id: current.id },
         data: {
-          status: "CONVERTED",
           convertedCustomerId: customer.id,
           convertedOpportunityId: opportunity.id,
-          version: { increment: 1 },
         },
       });
       await writeAudit(transaction, {
@@ -487,7 +525,6 @@ export class PrismaCrmRepository implements CrmRepository {
       include: {
         owner: { select: { id: true, name: true, email: true } },
         contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { firstName: "asc" }] },
-        followUps: { where: { deletedAt: null }, orderBy: { occurredAt: "desc" } },
         opportunities: { where: { deletedAt: null }, orderBy: { updatedAt: "desc" } },
         quotes: { where: { deletedAt: null }, orderBy: { updatedAt: "desc" } },
         orders: {
@@ -502,7 +539,11 @@ export class PrismaCrmRepository implements CrmRepository {
       },
     });
     if (!customer) return null;
-    const [files, activity] = await prisma.$transaction([
+    const [followUps, files, activity] = await prisma.$transaction([
+      prisma.followUp.findMany({
+        where: customerTimelineWhere(id),
+        orderBy: { occurredAt: "desc" },
+      }),
       prisma.fileAsset.findMany({
         where: { entityType: "Customer", entityId: id, deletedAt: null },
         orderBy: { createdAt: "desc" },
@@ -519,7 +560,7 @@ export class PrismaCrmRepository implements CrmRepository {
         take: 50,
       }),
     ]);
-    return { ...customer, files, activity };
+    return { ...customer, followUps, files, activity };
   }
 
   async createCustomer(context: AuthorizationContext, input: CreateCustomerData) {
@@ -724,11 +765,7 @@ export class PrismaCrmRepository implements CrmRepository {
         action: "follow_up.create",
         entityType: "FollowUp",
         entityId: followUp.id,
-        metadata: {
-          customerId: input.customerId,
-          leadId: input.leadId,
-          opportunityId: input.opportunityId,
-        },
+        metadata: followUpRelationMetadata(input),
       });
       return followUp;
     });
@@ -750,6 +787,7 @@ export class PrismaCrmRepository implements CrmRepository {
         action: "follow_up.update",
         entityType: "FollowUp",
         entityId: id,
+        metadata: followUpRelationMetadata(existing),
       });
       return followUp;
     });
@@ -758,7 +796,13 @@ export class PrismaCrmRepository implements CrmRepository {
   async deleteFollowUp(context: AuthorizationContext, id: string) {
     const existing = await getPrisma().followUp.findFirst({
       where: { id, deletedAt: null, ...relatedOwnershipWhere(context) },
-      select: { id: true },
+      select: {
+        id: true,
+        customerId: true,
+        contactId: true,
+        leadId: true,
+        opportunityId: true,
+      },
     });
     if (!existing) throw new DomainError("FOLLOW_UP_NOT_FOUND", "Follow-up not found", 404);
     return getPrisma().$transaction(async (transaction) => {
@@ -771,6 +815,7 @@ export class PrismaCrmRepository implements CrmRepository {
         action: "follow_up.archive",
         entityType: "FollowUp",
         entityId: id,
+        metadata: followUpRelationMetadata(existing),
       });
       return followUp;
     });
@@ -840,14 +885,11 @@ export class PrismaCrmRepository implements CrmRepository {
       select: { ownerId: true },
     });
     if (!customer) throw new DomainError("CUSTOMER_NOT_FOUND", "Customer not found", 404);
-    const ownId = ownerIdFor(context);
-    if (ownId && input.ownerId !== ownId) {
-      throw new DomainError("PERMISSION_DENIED", "Permission denied: opportunity.create", 403);
-    }
+    const ownerId = resolveOpportunityOwner(customer.ownerId, input.ownerId);
     const valueUsd = new Decimal(input.value).times(input.exchangeRateToUsd).toFixed(4);
     return getPrisma().$transaction(async (transaction) => {
       const opportunity = await transaction.opportunity.create({
-        data: { ...input, valueUsd },
+        data: { ...input, ownerId, valueUsd },
       });
       await writeAudit(transaction, {
         actorId: context.userId,
@@ -866,7 +908,7 @@ export class PrismaCrmRepository implements CrmRepository {
   ): Promise<OpportunityForStage | null> {
     return getPrisma().opportunity.findFirst({
       where: { id, deletedAt: null, ...ownershipWhere(context) },
-      select: { id: true, ownerId: true, stage: true },
+      select: { id: true, ownerId: true, stage: true, version: true },
     });
   }
 
@@ -878,17 +920,10 @@ export class PrismaCrmRepository implements CrmRepository {
       lossReason?: string | null;
     },
   ) {
-    const current = await this.findOpportunity(context, opportunity.id);
-    if (!current || current.stage !== opportunity.stage) {
-      throw new DomainError(
-        "OPPORTUNITY_STAGE_CONFLICT",
-        "Opportunity stage changed; refresh and retry",
-        409,
-      );
-    }
     return getPrisma().$transaction(async (transaction) => {
-      const updated = await transaction.opportunity.update({
-        where: { id: opportunity.id },
+      const guard = opportunityStageGuard(opportunity);
+      const result = await transaction.opportunity.updateMany({
+        where: { ...guard, ...ownershipWhere(context) },
         data: {
           stage: input.stage,
           lostReason: input.stage === "LOST" ? input.lossReason : null,
@@ -902,6 +937,16 @@ export class PrismaCrmRepository implements CrmRepository {
                 : undefined,
           version: { increment: 1 },
         },
+      });
+      if (result.count !== 1) {
+        throw new DomainError(
+          "OPPORTUNITY_STAGE_CONFLICT",
+          "Opportunity stage changed; refresh and retry",
+          409,
+        );
+      }
+      const updated = await transaction.opportunity.findUniqueOrThrow({
+        where: { id: opportunity.id },
         select: { id: true, stage: true, lostReason: true },
       });
       await writeAudit(transaction, {

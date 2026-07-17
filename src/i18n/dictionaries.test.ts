@@ -42,4 +42,15 @@ describe("locale dictionaries", () => {
       "Search customers, orders, quotes\u2026",
     );
   });
+
+  it("localizes Task 2 forms, dialogs, feedback, pagination, and boards", () => {
+    const dictionary = getDictionary("zh").crm;
+
+    expect(dictionary.fields.opportunityName).toBe("\u5546\u673a\u540d\u79f0");
+    expect(dictionary.actions.assignOwner).toBe("\u5206\u914d\u8d1f\u8d23\u4eba");
+    expect(dictionary.feedback.archiveConfirm).toContain("\u5f52\u6863");
+    expect(dictionary.pagination.previous).toBe("\u4e0a\u4e00\u9875");
+    expect(dictionary.statuses.NEGOTIATION).toBe("\u8c08\u5224");
+    expect(dictionary.channels.WECHAT).toBe("\u5fae\u4fe1");
+  });
 });

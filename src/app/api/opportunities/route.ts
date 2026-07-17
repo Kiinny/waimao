@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return success(
       await repository.createOpportunity(context, {
         ...input,
-        ownerId: input.ownerId ?? context.userId,
+        ownerId: input.ownerId,
       }),
       201,
     );

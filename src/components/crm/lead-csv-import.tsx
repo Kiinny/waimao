@@ -3,7 +3,21 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function LeadCsvImport() {
+export function LeadCsvImport({
+  labels,
+}: {
+  labels: {
+    label: string;
+    placeholder: string;
+    checking: string;
+    preview: string;
+    commit: string;
+    imported: string;
+    importFailed: string;
+    validRows: string;
+    rowError: string;
+  };
+}) {
   const router = useRouter();
   const [csv, setCsv] = useState("");
   const [preview, setPreview] = useState<{
@@ -29,10 +43,15 @@ export function LeadCsvImport() {
         error?: { message?: string };
       };
       if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.error?.message ?? "CSV import failed");
+        throw new Error(labels.importFailed);
       }
       if (commit) {
-        setFeedback(`${result.data.imported ?? 0} leads imported.`);
+        setFeedback(
+          labels.imported.replace(
+            "{count}",
+            String(result.data.imported ?? 0),
+          ),
+        );
         setCsv("");
         setPreview(null);
         router.refresh();
@@ -40,7 +59,7 @@ export function LeadCsvImport() {
         setPreview(result.data);
       }
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "CSV import failed");
+      setFeedback(error instanceof Error ? error.message : labels.importFailed);
     } finally {
       setBusy(false);
     }
@@ -49,29 +68,35 @@ export function LeadCsvImport() {
   return (
     <div className="crm-form">
       <textarea
-        aria-label="Lead CSV"
+        aria-label={labels.label}
         onChange={(event) => {
           setCsv(event.target.value);
           setPreview(null);
         }}
-        placeholder="companyName,contactName,email,phone,countryCode,source"
+        placeholder={labels.placeholder}
         rows={5}
         value={csv}
       />
       <div className="form-actions">
         <button className="button button-secondary" disabled={!csv || busy} onClick={() => request(false)} type="button">
-          {busy ? "Checking…" : "Preview and validate"}
+          {busy ? labels.checking : labels.preview}
         </button>
         {preview && preview.errors.length === 0 ? (
           <button className="button" disabled={busy} onClick={() => request(true)} type="button">
-            Commit {preview.validRows.length} rows
+            {labels.commit} {preview.validRows.length}
           </button>
         ) : null}
       </div>
       {preview ? (
         <p role="status">
-          {preview.validRows.length} valid / {preview.totalRows} total.
-          {preview.errors.map((error) => ` Row ${error.row}: ${error.issues.join(", ")}.`)}
+          {labels.validRows
+            .replace("{valid}", String(preview.validRows.length))
+            .replace("{total}", String(preview.totalRows))}
+          {preview.errors.map((error) =>
+            ` ${labels.rowError
+              .replace("{row}", String(error.row))
+              .replace("{issues}", error.issues.join(", "))}`,
+          )}
         </p>
       ) : null}
       {feedback ? <p role="status">{feedback}</p> : null}

@@ -9,7 +9,8 @@ The coherent Sales CRM scope is implemented, verified, and committed. Core serve
 ## Commits
 
 - `cf9a122` — `feat: implement sales CRM workflows`
-- This report is committed separately so it can name the implementation commit exactly.
+- `b466523` — `docs: record sales CRM verification`
+- The review-fix commit is recorded in the parent handoff because this report is part of that commit.
 
 ## Delivered Features
 
@@ -72,6 +73,31 @@ Final fresh gate:
 - `git diff --cached --check`
   - Exit `0` before the implementation commit.
 
+## Review Fix Pass
+
+The review findings were addressed with surgical changes:
+
+- Dashboard access now requires `dashboard.read` and an explicit role/domain scope. Sales managers and administrators receive global sales scope, sales representatives receive owner-only sales scope, and operations roles receive operational metrics without CRM aggregates.
+- Converted leads are immutable across edit, batch, and reconversion paths. Conversion atomically claims an unconverted lead, and unique database indexes protect converted Customer and Opportunity identities.
+- Customer timelines include direct, Contact-linked, and Opportunity-linked follow-ups. Follow-up audit metadata records all related entity IDs.
+- Opportunity ownership is inherited from the Customer. Stage updates use the Opportunity version and current stage in a conditional write to reject stale concurrent moves.
+- The CRM UI now exposes Contact and follow-up edit/archive controls, batch owner assignment, converted-lead safeguards, and localized Task 2 forms, dialogs, feedback, pagination, CSV, and board text in English and Chinese.
+- The invalid converted-lead select default was removed.
+
+Review red/green evidence:
+
+- Focused dashboard/CRM tests initially failed 11 tests for the missing access-scope, immutability, relation, ownership, and concurrency behavior; after the fixes, the focused suite passed 34/34 tests.
+- A new KPI permission regression test first failed because `dashboardKpis` did not require `dashboard.read`; after adding the guard it passed.
+
+Final fresh review gate:
+
+- Focused suite: 5 files passed, 40 tests passed, 0 failed.
+- `pnpm test`: 17 files passed, 90 tests passed, 0 failed.
+- `pnpm typecheck`: exit `0`.
+- `pnpm lint`: exit `0`.
+- `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm pnpm prisma:generate`: exit `0`; Prisma Client 7.8.0 generated.
+- `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm pnpm build`: exit `0`; Next.js 16.2.10 generated 29 routes/pages.
+
 ## Self-Review
 
 - Ownership is enforced twice: API permissions gate entry and repository predicates restrict identities/aggregates. Representative-supplied `ownerId` filters cannot replace the authenticated owner scope.
@@ -88,5 +114,3 @@ Final fresh gate:
 - Playwright is not installed or configured in the foundation, and no browser runtime is available through the package scripts; representative E2E coverage was therefore not added or run.
 - A live PostgreSQL service was not available in this workspace. Prisma schema generation and production build were verified, but the new migration and deterministic seed were not applied against a running database.
 - The foundation has no shared Excel export service, so Task 2 delivers CSV import/export only.
-- The lead list exposes confirmed batch status changes in the UI. Owner reassignment is implemented and scoped in the API/repository, but the list UI does not yet provide a user picker.
-- Contact and follow-up update/archive operations are available through scoped APIs; the delivered detail UI emphasizes create/read workflows and does not expose every update/archive control.

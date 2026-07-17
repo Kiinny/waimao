@@ -24,8 +24,16 @@ interface OpportunityCard {
 
 export function OpportunityBoard({
   opportunities,
+  labels,
 }: {
   opportunities: OpportunityCard[];
+  labels: {
+    stagePrompt: string;
+    stageFailed: string;
+    stageMoved: string;
+    moving: string;
+    stages: Record<string, string>;
+  };
 }) {
   const router = useRouter();
   const [feedback, setFeedback] = useState("");
@@ -36,7 +44,7 @@ export function OpportunityBoard({
     if (!current || current.stage === stage) return;
     const lossReason =
       stage === "LOST"
-        ? window.prompt("Loss reason (required)")
+        ? window.prompt(labels.stagePrompt)
         : undefined;
     if (stage === "LOST" && !lossReason?.trim()) return;
     setMoving(id);
@@ -52,12 +60,12 @@ export function OpportunityBoard({
         error?: { message?: string };
       };
       if (!response.ok || !result.success) {
-        throw new Error(result.error?.message ?? "Stage update failed");
+        throw new Error(labels.stageFailed);
       }
-      setFeedback("Opportunity moved.");
+      setFeedback(labels.stageMoved);
       router.refresh();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Stage update failed");
+      setFeedback(error instanceof Error ? error.message : labels.stageFailed);
     } finally {
       setMoving("");
     }
@@ -74,7 +82,7 @@ export function OpportunityBoard({
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => move(event.dataTransfer.getData("text/plain"), stage)}
           >
-            <h2>{stage.replaceAll("_", " ")}</h2>
+            <h2>{labels.stages[stage]}</h2>
             {opportunities.filter((item) => item.stage === stage).map((item) => (
               <article
                 className="opportunity-card"
@@ -86,7 +94,7 @@ export function OpportunityBoard({
                 <span>{item.customerName}</span>
                 <span>${Number(item.valueUsd).toLocaleString()} · {item.probability}%</span>
                 <span>{item.ownerName}</span>
-                {moving === item.id ? <small>Moving…</small> : null}
+                {moving === item.id ? <small>{labels.moving}</small> : null}
               </article>
             ))}
           </section>

@@ -29,6 +29,57 @@ export function assertOwned(
   requirePermission(context, permission, record);
 }
 
+export function assertLeadMutable(status: string) {
+  if (status === "CONVERTED") {
+    throw new DomainError(
+      "LEAD_ALREADY_CONVERTED",
+      "Lead is already converted and is immutable",
+      409,
+    );
+  }
+}
+
+export function customerTimelineWhere(customerId: string) {
+  return {
+    deletedAt: null,
+    OR: [
+      { customerId },
+      { contact: { customerId } },
+      { opportunity: { customerId } },
+    ],
+  };
+}
+
+export interface FollowUpRelationIds {
+  customerId?: string | null;
+  contactId?: string | null;
+  leadId?: string | null;
+  opportunityId?: string | null;
+}
+
+export function followUpRelationMetadata(input: FollowUpRelationIds) {
+  return {
+    customerId: input.customerId ?? null,
+    contactId: input.contactId ?? null,
+    leadId: input.leadId ?? null,
+    opportunityId: input.opportunityId ?? null,
+  };
+}
+
+export function resolveOpportunityOwner(
+  customerOwnerId: string,
+  requestedOwnerId?: string,
+) {
+  if (requestedOwnerId && requestedOwnerId !== customerOwnerId) {
+    throw new DomainError(
+      "OPPORTUNITY_OWNER_MISMATCH",
+      "Opportunity owner must match the customer owner",
+      409,
+    );
+  }
+  return customerOwnerId;
+}
+
 interface DuplicateCandidate {
   companyName?: string | null;
   email?: string | null;
@@ -107,6 +158,19 @@ export const opportunityStages = [
 ] as const;
 
 export type OpportunityStageValue = (typeof opportunityStages)[number];
+
+export function opportunityStageGuard(opportunity: {
+  id: string;
+  stage: OpportunityStageValue;
+  version: number;
+}) {
+  return {
+    id: opportunity.id,
+    stage: opportunity.stage,
+    version: opportunity.version,
+    deletedAt: null,
+  };
+}
 
 const activeStages = opportunityStages.slice(0, 4);
 

@@ -61,19 +61,18 @@ export function ApiMutationForm({
       });
       const result = (await response.json()) as {
         success: boolean;
-        error?: { message?: string };
       };
       if (!response.ok || !result.success) {
-        throw new Error(result.error?.message || failureMessage);
+        throw new Error(failureMessage);
       }
       setState("success");
       setMessage(successMessage);
       if (method === "POST") form.reset();
       if (redirectTo) router.push(redirectTo);
       router.refresh();
-    } catch (error) {
+    } catch {
       setState("error");
-      setMessage(error instanceof Error ? error.message : failureMessage);
+      setMessage(failureMessage);
     }
   }
 

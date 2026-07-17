@@ -45,10 +45,12 @@ export interface DashboardRepository {
   loadSnapshot(context: AuthorizationContext): Promise<DashboardSnapshot>;
 }
 
-export function loadDashboard(
+export async function loadDashboard(
   repository: DashboardRepository,
   context: AuthorizationContext,
 ) {
+  requirePermission(context, "dashboard.read");
+  dashboardAccessScope(context);
   return repository.loadSnapshot(context);
 }
 
@@ -56,11 +58,9 @@ export function dashboardKpis(
   context: AuthorizationContext,
   snapshot: DashboardSnapshot,
 ) {
-  const salesRole =
-    context.roles?.includes("SALES_REP") ||
-    context.roles?.includes("SALES_MANAGER") ||
-    context.roles?.includes("SUPER_ADMIN");
-  return salesRole
+  requirePermission(context, "dashboard.read");
+  const access = dashboardAccessScope(context);
+  return access.domain === "sales"
     ? ([
         ["activeCustomers", snapshot.activeCustomers],
         ["openLeads", snapshot.openLeads],
@@ -68,10 +68,10 @@ export function dashboardKpis(
         ["weightedForecastUsd", snapshot.weightedForecastUsd],
       ] as const)
     : ([
-        ["activeCustomers", snapshot.activeCustomers],
-        ["openQuotes", snapshot.openQuotes],
         ["activeOrders", snapshot.activeOrders],
         ["dueTasks", snapshot.dueTasks],
       ] as const);
 }
 import type { AuthorizationContext } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
+import { dashboardAccessScope } from "@/modules/dashboard/dashboard-scope";

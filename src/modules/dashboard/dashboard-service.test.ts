@@ -48,9 +48,54 @@ describe("dashboard service", () => {
     await expect(loadDashboard(repository, context)).resolves.toBe(snapshot);
     expect(contexts).toEqual([context]);
   });
+
+  it("requires dashboard.read before calling the repository", async () => {
+    let called = false;
+    const repository: DashboardRepository = {
+      loadSnapshot: async () => {
+        called = true;
+        return snapshot;
+      },
+    };
+
+    await expect(
+      loadDashboard(repository, {
+        userId: "sales-1",
+        roles: ["SALES_REP"],
+        permissions: ["customer.read"],
+      }),
+    ).rejects.toThrow(/dashboard\.read/);
+    expect(called).toBe(false);
+  });
+
+  it("rejects a role outside the explicit dashboard domains", async () => {
+    const repository: DashboardRepository = {
+      loadSnapshot: async () => snapshot,
+    };
+    await expect(
+      loadDashboard(repository, {
+        userId: "custom-1",
+        roles: ["CUSTOM"],
+        permissions: ["dashboard.read"],
+      }),
+    ).rejects.toThrow(/dashboard/i);
+  });
 });
 
 describe("dashboard KPI selection", () => {
+  it("does not expose KPI values without dashboard.read", () => {
+    expect(() =>
+      dashboardKpis(
+        {
+          userId: "sales-1",
+          roles: ["SALES_REP"],
+          permissions: ["customer.read"],
+        },
+        snapshot,
+      ),
+    ).toThrowError(/dashboard\.read/);
+  });
+
   it("shows sales pipeline KPIs to sales roles", () => {
     expect(
       dashboardKpis(
@@ -80,8 +125,6 @@ describe("dashboard KPI selection", () => {
         snapshot,
       ),
     ).toEqual([
-      ["activeCustomers", 2],
-      ["openQuotes", 3],
       ["activeOrders", 4],
       ["dueTasks", 1],
     ]);

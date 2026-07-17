@@ -6,6 +6,7 @@ import { getDictionary, isLocale } from "@/i18n/dictionaries";
 import { currentAuthorizationContext } from "@/lib/current-user";
 import { dashboardKpis, loadDashboard } from "@/modules/dashboard/dashboard-service";
 import { PrismaDashboardRepository } from "@/modules/dashboard/prisma-dashboard-repository";
+import { dashboardAccessScope } from "@/modules/dashboard/dashboard-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function DashboardPage({
   const session = await auth();
   const context = await currentAuthorizationContext();
   const dictionary = getDictionary(locale);
+  const access = dashboardAccessScope(context);
   const snapshot = await loadDashboard(
     new PrismaDashboardRepository(),
     context,
@@ -65,10 +67,10 @@ export default async function DashboardPage({
           </article>
         ))}
       </section>
-      <div className="dashboard-grid">
+      {access.domain === "sales" ? <div className="dashboard-grid">
         <section className="card section-card">
           <h2 className="section-title">{dictionary.dashboard.funnel}</h2>
-          {snapshot.salesFunnel.length ? <div className="bar-chart">{snapshot.salesFunnel.map((item) => <div className="bar-row" key={item.stage}><span>{item.stage}</span><div><i style={{ width: `${Math.max(5, item.count / maxFunnel * 100)}%` }} /></div><strong>{item.count}</strong></div>)}</div> : <EmptyState title={dictionary.crm.empty} />}
+          {snapshot.salesFunnel.length ? <div className="bar-chart">{snapshot.salesFunnel.map((item) => <div className="bar-row" key={item.stage}><span>{dictionary.crm.statuses[item.stage as keyof typeof dictionary.crm.statuses] ?? item.stage}</span><div><i style={{ width: `${Math.max(5, item.count / maxFunnel * 100)}%` }} /></div><strong>{item.count}</strong></div>)}</div> : <EmptyState title={dictionary.crm.empty} />}
         </section>
         <section className="card section-card">
           <h2 className="section-title">{dictionary.dashboard.orderTrend}</h2>
@@ -82,15 +84,16 @@ export default async function DashboardPage({
           <h2 className="section-title">{dictionary.dashboard.upcomingFollowUps}</h2>
           {snapshot.upcomingFollowUps.length ? <ol className="timeline compact">{snapshot.upcomingFollowUps.map((item) => <li key={item.id}><strong>{item.related}</strong><p>{item.summary}</p><time>{item.nextActionAt.toLocaleString(locale)}</time></li>)}</ol> : <EmptyState title={dictionary.crm.empty} />}
         </section>
-      </div>
-      <div className="dashboard-grid">
+      </div> : null}
+      <div className={access.domain === "sales" ? "dashboard-grid" : ""}>
+        {access.domain === "sales" ? (
         <section className="card section-card">
           <h2 className="section-title">{dictionary.dashboard.recentLeads}</h2>
-          {snapshot.recentLeads.length ? <div className="table-wrap"><table><thead><tr><th>Company</th><th>Status</th><th>Added</th></tr></thead><tbody>{snapshot.recentLeads.map((lead) => <tr key={lead.id}><td>{lead.companyName}</td><td>{lead.status}</td><td>{lead.createdAt.toLocaleDateString(locale)}</td></tr>)}</tbody></table></div> : <EmptyState title={dictionary.crm.empty} />}
-        </section>
+          {snapshot.recentLeads.length ? <div className="table-wrap"><table><thead><tr><th>{dictionary.dashboard.table.company}</th><th>{dictionary.dashboard.table.status}</th><th>{dictionary.dashboard.table.added}</th></tr></thead><tbody>{snapshot.recentLeads.map((lead) => <tr key={lead.id}><td>{lead.companyName}</td><td>{dictionary.crm.statuses[lead.status as keyof typeof dictionary.crm.statuses] ?? lead.status}</td><td>{lead.createdAt.toLocaleDateString(locale)}</td></tr>)}</tbody></table></div> : <EmptyState title={dictionary.crm.empty} />}
+        </section>) : null}
         <section className="card section-card">
           <h2 className="section-title">{dictionary.dashboard.recentOrders}</h2>
-          {snapshot.recentOrders.length ? <div className="table-wrap"><table><thead><tr><th>Order</th><th>Status</th><th>USD</th></tr></thead><tbody>{snapshot.recentOrders.map((order) => <tr key={order.id}><td>{order.orderNumber}</td><td>{order.status}</td><td>${Number(order.totalUsd).toLocaleString(locale)}</td></tr>)}</tbody></table></div> : <EmptyState title={dictionary.crm.empty} />}
+          {snapshot.recentOrders.length ? <div className="table-wrap"><table><thead><tr><th>{dictionary.dashboard.table.order}</th><th>{dictionary.dashboard.table.status}</th><th>{dictionary.dashboard.table.usd}</th></tr></thead><tbody>{snapshot.recentOrders.map((order) => <tr key={order.id}><td>{order.orderNumber}</td><td>{order.status}</td><td>${Number(order.totalUsd).toLocaleString(locale)}</td></tr>)}</tbody></table></div> : <EmptyState title={dictionary.crm.empty} />}
         </section>
       </div>
       <section
@@ -104,7 +107,7 @@ export default async function DashboardPage({
         </h2>
         <p className="muted">
           {snapshot.dueTasks || snapshot.risks.overdueFollowUps || snapshot.risks.highRiskCustomers || snapshot.risks.staleOpportunities
-            ? `${snapshot.dueTasks} ${dictionary.dashboard.risks.overdueTasks} ${snapshot.risks.overdueFollowUps} overdue follow-ups, ${snapshot.risks.highRiskCustomers} high-risk customers, and ${snapshot.risks.staleOpportunities} stale opportunities.`
+            ? `${snapshot.dueTasks} ${dictionary.dashboard.risks.overdueTasks} ${snapshot.risks.overdueFollowUps} ${dictionary.dashboard.risks.overdueFollowUps}, ${snapshot.risks.highRiskCustomers} ${dictionary.dashboard.risks.highRiskCustomers}, ${snapshot.risks.staleOpportunities} ${dictionary.dashboard.risks.staleOpportunities}.`
             : dictionary.dashboard.risks.clear}
         </p>
       </section>

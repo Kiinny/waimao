@@ -289,8 +289,8 @@ model Lead {
   status                 LeadStatus @default(NEW)
   notes                  String?
   ownerId                String     @db.Uuid
-  convertedCustomerId    String?    @db.Uuid
-  convertedOpportunityId String?    @db.Uuid
+  convertedCustomerId    String?    @unique @db.Uuid
+  convertedOpportunityId String?    @unique @db.Uuid
   version                Int        @default(1)
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt

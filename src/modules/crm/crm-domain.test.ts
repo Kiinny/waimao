@@ -8,6 +8,11 @@ import {
   findLeadDuplicates,
   isFollowUpOverdue,
   crmOwnerWhere,
+  assertLeadMutable,
+  customerTimelineWhere,
+  followUpRelationMetadata,
+  opportunityStageGuard,
+  resolveOpportunityOwner,
   weightedForecast,
 } from "@/modules/crm/crm-domain";
 
@@ -91,6 +96,67 @@ describe("lead duplicate detection", () => {
         rows,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("converted lead immutability", () => {
+  it("rejects edits and batch changes after conversion", () => {
+    expect(() => assertLeadMutable("CONVERTED")).toThrowError(/converted/i);
+    expect(() => assertLeadMutable("QUALIFIED")).not.toThrow();
+  });
+});
+
+describe("customer relationship invariants", () => {
+  it("loads direct, contact, and opportunity follow-ups into the timeline", () => {
+    expect(customerTimelineWhere("customer-1")).toEqual({
+      deletedAt: null,
+      OR: [
+        { customerId: "customer-1" },
+        { contact: { customerId: "customer-1" } },
+        { opportunity: { customerId: "customer-1" } },
+      ],
+    });
+  });
+
+  it("records every follow-up relationship in audit metadata", () => {
+    expect(
+      followUpRelationMetadata({
+        customerId: "customer-1",
+        contactId: "contact-1",
+        leadId: "lead-1",
+        opportunityId: "opportunity-1",
+      }),
+    ).toEqual({
+      customerId: "customer-1",
+      contactId: "contact-1",
+      leadId: "lead-1",
+      opportunityId: "opportunity-1",
+    });
+  });
+});
+
+describe("opportunity consistency", () => {
+  it("inherits customer ownership and rejects mismatched requested owners", () => {
+    expect(resolveOpportunityOwner("sales-1")).toBe("sales-1");
+    expect(resolveOpportunityOwner("sales-1", "sales-1")).toBe("sales-1");
+    expect(() =>
+      resolveOpportunityOwner("sales-1", "sales-2"),
+    ).toThrowError(/owner/i);
+  });
+
+  it("builds a stage update guard from id, current stage, and version", () => {
+    expect(
+      opportunityStageGuard({
+        id: "opportunity-1",
+        stage: "DISCOVERY",
+        version: 7,
+      }),
+    ).toEqual({
+      id: "opportunity-1",
+      stage: "DISCOVERY",
+      version: 7,
+      deletedAt: null,
+    });
   });
 });
 

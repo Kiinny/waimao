@@ -1,6 +1,7 @@
 import { DomainError } from "@/lib/errors";
 import type { AuthorizationContext } from "@/lib/rbac";
 import {
+  assertLeadMutable,
   assertOpportunityTransition,
   assertOwned,
   type OpportunityStageValue,
@@ -8,6 +9,7 @@ import {
 
 export interface LeadForConversion {
   id: string;
+  version: number;
   ownerId: string;
   status: string;
   companyName: string;
@@ -21,6 +23,7 @@ export interface OpportunityForStage {
   id: string;
   ownerId: string;
   stage: OpportunityStageValue;
+  version: number;
 }
 
 export interface ConvertLeadInput {
@@ -80,13 +83,7 @@ export async function convertLead(
     throw new DomainError("LEAD_NOT_FOUND", "Lead not found", 404);
   }
   assertOwned(context, lead, "lead.update");
-  if (lead.status === "CONVERTED") {
-    throw new DomainError(
-      "LEAD_ALREADY_CONVERTED",
-      "Lead is already converted",
-      409,
-    );
-  }
+  assertLeadMutable(lead.status);
   return repository.convertLeadAtomically(context, lead, {
     ...input,
     ownerId: lead.ownerId,
