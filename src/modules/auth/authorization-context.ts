@@ -6,6 +6,7 @@ export interface AuthorizationUserRecord {
   status: "ACTIVE" | "INACTIVE" | "LOCKED";
   deletedAt: Date | null;
   roles: Array<{
+    code: string;
     deletedAt: Date | null;
     permissions: string[];
   }>;
@@ -28,6 +29,13 @@ export async function loadAuthorizationContext(
 
   return {
     userId: user.id,
+    roles: [
+      ...new Set(
+        user.roles
+          .filter((role) => role.deletedAt === null)
+          .map((role) => role.code),
+      ),
+    ],
     permissions: [
       ...new Set(
         user.roles

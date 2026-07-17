@@ -23,6 +23,16 @@ describe("locale dictionaries", () => {
     );
   });
 
+  it("provides Chinese search labels and shell accessibility text", () => {
+    const dictionary = getDictionary("zh");
+
+    expect(dictionary.search.table.type).toBe("\u7c7b\u578b");
+    expect(dictionary.search.entities.customer).toBe("\u5ba2\u6237");
+    expect(dictionary.search.entities.order).toBe("\u8ba2\u5355");
+    expect(dictionary.search.entities.quote).toBe("\u62a5\u4ef7");
+    expect(dictionary.signOutLabel).toBe("\u9000\u51fa\u767b\u5f55");
+  });
+
   it("keeps English punctuation readable", () => {
     expect(getDictionary("en").search.placeholder).toBe(
       "Search customers, orders, quotes\u2026",

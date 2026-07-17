@@ -1,4 +1,6 @@
 import { DomainError } from "@/lib/errors";
+import type { AuthorizationContext } from "@/lib/rbac";
+import { requirePermission } from "@/lib/rbac";
 
 const IMMUTABLE_QUOTE_STATUSES = new Set([
   "SENT",
@@ -13,6 +15,7 @@ export interface QuoteVersionState {
   id: string;
   quoteStatus: string;
   immutableAt: Date | null;
+  quoteOwnerId: string;
 }
 
 export interface QuoteVersionChanges {
@@ -42,6 +45,7 @@ export function assertQuoteVersionMutable(state: QuoteVersionState) {
 
 export async function updateQuoteVersion(
   repository: QuoteVersionRepository,
+  context: AuthorizationContext,
   versionId: string,
   changes: QuoteVersionChanges,
 ) {
@@ -49,6 +53,9 @@ export async function updateQuoteVersion(
   if (!state) {
     throw new DomainError("QUOTE_VERSION_NOT_FOUND", "Quote version not found", 404);
   }
+  requirePermission(context, "quote.update", {
+    ownerId: state.quoteOwnerId,
+  });
   assertQuoteVersionMutable(state);
   return repository.updateVersion(versionId, changes);
 }

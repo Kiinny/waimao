@@ -86,7 +86,7 @@ export function AppShell({
               <button
                 className="icon-button focus-ring"
                 title={user.email ?? undefined}
-                aria-label="Sign out"
+                aria-label={dictionary.signOutLabel}
                 type="submit"
               >
                 {(user.name ?? "U").slice(0, 1).toUpperCase()}

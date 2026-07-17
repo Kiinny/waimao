@@ -22,10 +22,12 @@ describe("server authorization context", () => {
       deletedAt: null,
       roles: [
         {
+          code: "SALES_REP",
           deletedAt: null,
           permissions: ["user.read", "role.read", "user.read"],
         },
         {
+          code: "SUPER_ADMIN",
           deletedAt: new Date("2026-01-01"),
           permissions: ["*", "finance.profit.read"],
         },
@@ -35,6 +37,7 @@ describe("server authorization context", () => {
     await expect(loadAuthorizationContext(repository, "user-1")).resolves.toEqual(
       {
         userId: "user-1",
+        roles: ["SALES_REP"],
         permissions: ["user.read", "role.read"],
       },
     );
@@ -47,7 +50,7 @@ describe("server authorization context", () => {
         id: "user-1",
         status,
         deletedAt: null,
-        roles: [{ deletedAt: null, permissions: ["*"] }],
+        roles: [{ code: "SUPER_ADMIN", deletedAt: null, permissions: ["*"] }],
       }));
 
       await expect(
@@ -64,7 +67,7 @@ describe("server authorization context", () => {
       id: "user-1",
       status: "ACTIVE",
       deletedAt: new Date("2026-01-01"),
-      roles: [{ deletedAt: null, permissions: ["*"] }],
+      roles: [{ code: "SUPER_ADMIN", deletedAt: null, permissions: ["*"] }],
     }));
 
     await expect(
@@ -80,6 +83,7 @@ describe("server authorization context", () => {
       deletedAt: null,
       roles: [
         {
+          code: "SALES_REP",
           deletedAt: roleDeleted ? new Date("2026-01-01") : null,
           permissions: ["role.update"],
         },
@@ -87,9 +91,9 @@ describe("server authorization context", () => {
     }));
 
     await expect(loadAuthorizationContext(repository, "user-1")).resolves
-      .toMatchObject({ permissions: ["role.update"] });
+      .toMatchObject({ roles: ["SALES_REP"], permissions: ["role.update"] });
     roleDeleted = true;
     await expect(loadAuthorizationContext(repository, "user-1")).resolves
-      .toMatchObject({ permissions: [] });
+      .toMatchObject({ roles: [], permissions: [] });
   });
 });

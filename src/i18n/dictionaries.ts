@@ -6,6 +6,7 @@ const dictionaries = {
     appName: "Atlas CRM",
     languageName: "English",
     languageSwitch: "Switch language",
+    signOutLabel: "Sign out",
     notificationsLabel: "View notifications and risks",
     nav: {
       workspace: "Workspace",
@@ -20,6 +21,16 @@ const dictionaries = {
       title: "Search",
       results: "Results for",
       empty: "No matching customers, orders or quotes.",
+      table: {
+        type: "Type",
+        reference: "Reference",
+        statusCountry: "Status / Country",
+      },
+      entities: {
+        customer: "Customer",
+        order: "Order",
+        quote: "Quote",
+      },
     },
     dashboard: {
       title: "Good to see you",
@@ -80,6 +91,7 @@ const dictionaries = {
     appName: "Atlas \u5916\u8d38 CRM",
     languageName: "\u4e2d\u6587",
     languageSwitch: "\u5207\u6362\u8bed\u8a00",
+    signOutLabel: "\u9000\u51fa\u767b\u5f55",
     notificationsLabel: "\u67e5\u770b\u901a\u77e5\u4e0e\u98ce\u9669",
     nav: {
       workspace: "\u5de5\u4f5c\u53f0",
@@ -96,6 +108,16 @@ const dictionaries = {
       results: "\u641c\u7d22\u7ed3\u679c",
       empty:
         "\u672a\u627e\u5230\u5339\u914d\u7684\u5ba2\u6237\u3001\u8ba2\u5355\u6216\u62a5\u4ef7\u3002",
+      table: {
+        type: "\u7c7b\u578b",
+        reference: "\u53c2\u8003\u53f7",
+        statusCountry: "\u72b6\u6001 / \u56fd\u5bb6\u5730\u533a",
+      },
+      entities: {
+        customer: "\u5ba2\u6237",
+        order: "\u8ba2\u5355",
+        quote: "\u62a5\u4ef7",
+      },
     },
     dashboard: {
       title: "\u6b22\u8fce\u56de\u6765",

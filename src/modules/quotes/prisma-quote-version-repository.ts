@@ -12,7 +12,7 @@ export function createPrismaQuoteVersionRepository(): QuoteVersionRepository {
         select: {
           id: true,
           immutableAt: true,
-          quote: { select: { status: true } },
+          quote: { select: { status: true, ownerId: true } },
         },
       });
       if (!version) return null;
@@ -20,6 +20,7 @@ export function createPrismaQuoteVersionRepository(): QuoteVersionRepository {
         id: version.id,
         immutableAt: version.immutableAt,
         quoteStatus: version.quote.status,
+        quoteOwnerId: version.quote.ownerId,
       };
     },
     updateVersion(versionId, changes: QuoteVersionChanges) {

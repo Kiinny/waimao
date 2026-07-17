@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { currentAuthorizationContext } from "@/lib/current-user";
 import { failure, success } from "@/lib/http";
-import { requirePermission } from "@/lib/rbac";
 import { createPrismaQuoteVersionRepository } from "@/modules/quotes/prisma-quote-version-repository";
 import { updateQuoteVersion } from "@/modules/quotes/quote-service";
 
@@ -24,11 +23,11 @@ export async function PATCH(
 ) {
   try {
     const context = await currentAuthorizationContext();
-    requirePermission(context, "quote.update");
     const { id } = await params;
     const input = updateSchema.parse(await request.json());
     const version = await updateQuoteVersion(
       createPrismaQuoteVersionRepository(),
+      context,
       id,
       input,
     );

@@ -124,3 +124,54 @@ pnpm build
 ### Remaining concern
 
 - Docker/Compose execution remains unverified because the Docker CLI is unavailable in this environment.
+
+## Ownership and localization re-review fixes
+
+### Fixes delivered
+
+- Live authorization contexts now include only current, non-deleted role codes as well as current permissions.
+- Added a pure, tested global-search ownership scope. Sales Representatives receive `ownerId = current user` filters for customer, sales-order and quotation queries; Sales Managers and wildcard administrators keep their permitted wider scope.
+- Quote-version state now loads the parent quote owner. The service used by PATCH performs ownership-aware `quote.update` authorization before checking mutability or writing changes, so cross-owner Sales Representative updates are rejected while Sales Managers and administrators retain their allowed scope.
+- Added localized English/Chinese search table headings and entity type labels, plus a localized shell sign-out accessible label.
+
+### Exact checks and results
+
+- Focused ownership/localization tests:
+
+  ```powershell
+  pnpm test src/modules/search/search-scope.test.ts src/modules/quotes/quote-service.test.ts src/lib/rbac.test.ts src/i18n/dictionaries.test.ts src/modules/auth/authorization-context.test.ts
+  ```
+
+  Result: PASS — 5 test files, 29 tests, 0 failures.
+
+- Full unit suite:
+
+  ```powershell
+  pnpm test
+  ```
+
+  Result: PASS — 11 test files, 50 tests, 0 failures.
+
+- TypeScript:
+
+  ```powershell
+  pnpm typecheck
+  ```
+
+  Result: PASS — `tsc --noEmit`, exit code 0.
+
+- ESLint:
+
+  ```powershell
+  pnpm lint
+  ```
+
+  Result: PASS — exit code 0 with no warnings/errors.
+
+- Production build:
+
+  ```powershell
+  pnpm build
+  ```
+
+  Result: PASS — Next.js 16.2.10 compiled, typechecked and generated all 16 route entries.

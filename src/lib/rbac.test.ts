@@ -25,6 +25,20 @@ describe("RBAC", () => {
     expect(can(salesRep, "customer.update", { ownerId: "sales-2" })).toBe(false);
   });
 
+  it("allows a sales manager to act across owned sales records", () => {
+    expect(
+      can(
+        {
+          userId: "manager-1",
+          roles: ["SALES_MANAGER"],
+          permissions: ["quote.update"],
+        },
+        "quote.update",
+        { ownerId: "sales-1" },
+      ),
+    ).toBe(true);
+  });
+
   it.each(["purchase.cost.read", "finance.profit.read"] as const)(
     "does not infer the sensitive %s permission",
     (permission) => {

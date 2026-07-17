@@ -19,6 +19,7 @@ export function createPrismaAuthorizationRepository(): AuthorizationRepository {
             select: {
               role: {
                 select: {
+                  code: true,
                   deletedAt: true,
                   permissions: {
                     select: { permission: { select: { code: true } } },
@@ -36,6 +37,7 @@ export function createPrismaAuthorizationRepository(): AuthorizationRepository {
         status: user.status,
         deletedAt: user.deletedAt,
         roles: user.roles.map(({ role }) => ({
+          code: role.code,
           deletedAt: role.deletedAt,
           permissions: role.permissions.map(
             ({ permission }) => permission.code,

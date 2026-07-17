@@ -20,15 +20,22 @@ function repositoryFor(state: QuoteVersionState) {
 }
 
 describe("quotation immutability", () => {
+  const salesRep = {
+    userId: "sales-1",
+    roles: ["SALES_REP"],
+    permissions: ["quote.update"],
+  };
+
   it("updates an editable draft version", async () => {
     const state = repositoryFor({
       id: "version-1",
       quoteStatus: "DRAFT",
       immutableAt: null,
+      quoteOwnerId: "sales-1",
     });
 
     await expect(
-      updateQuoteVersion(state.repository, "version-1", {
+      updateQuoteVersion(state.repository, salesRep, "version-1", {
         remarks: "Updated terms",
       }),
     ).resolves.toMatchObject({ remarks: "Updated terms" });
@@ -42,14 +49,53 @@ describe("quotation immutability", () => {
         id: "version-1",
         quoteStatus,
         immutableAt: new Date("2026-01-01"),
+        quoteOwnerId: "sales-1",
       });
 
       await expect(
-        updateQuoteVersion(state.repository, "version-1", {
+        updateQuoteVersion(state.repository, salesRep, "version-1", {
           remarks: "Tampered",
         }),
       ).rejects.toMatchObject({ code: "QUOTE_IMMUTABLE", status: 409 });
       expect(state.updates).toEqual([]);
     },
   );
+
+  it("rejects a Sales Representative updating another owner's draft", async () => {
+    const state = repositoryFor({
+      id: "version-1",
+      quoteStatus: "DRAFT",
+      immutableAt: null,
+      quoteOwnerId: "sales-2",
+    });
+
+    await expect(
+      updateQuoteVersion(state.repository, salesRep, "version-1", {
+        remarks: "Cross-owner change",
+      }),
+    ).rejects.toMatchObject({ code: "PERMISSION_DENIED", status: 403 });
+    expect(state.updates).toEqual([]);
+  });
+
+  it("allows a Sales Manager updating a representative's draft", async () => {
+    const state = repositoryFor({
+      id: "version-1",
+      quoteStatus: "DRAFT",
+      immutableAt: null,
+      quoteOwnerId: "sales-2",
+    });
+
+    await expect(
+      updateQuoteVersion(
+        state.repository,
+        {
+          userId: "manager-1",
+          roles: ["SALES_MANAGER"],
+          permissions: ["quote.update"],
+        },
+        "version-1",
+        { remarks: "Manager review" },
+      ),
+    ).resolves.toMatchObject({ remarks: "Manager review" });
+  });
 });

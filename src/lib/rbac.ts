@@ -7,11 +7,26 @@ export const SENSITIVE_PERMISSIONS = [
 
 export interface AuthorizationContext {
   userId: string;
+  roles?: readonly string[];
   permissions: readonly string[];
 }
 
 export interface OwnedResource {
   ownerId?: string | null;
+}
+
+export function hasGlobalOwnershipScope(
+  context: AuthorizationContext,
+  permission?: string,
+) {
+  return (
+    context.permissions.includes("*") ||
+    (permission
+      ? context.permissions.includes(`${permission}.all`)
+      : false) ||
+    context.roles?.includes("SUPER_ADMIN") === true ||
+    context.roles?.includes("SALES_MANAGER") === true
+  );
 }
 
 export function can(
@@ -30,8 +45,7 @@ export function can(
   if (resource?.ownerId) {
     return (
       resource.ownerId === context.userId ||
-      context.permissions.includes(`${permission}.all`) ||
-      context.permissions.includes("*")
+      hasGlobalOwnershipScope(context, permission)
     );
   }
 
