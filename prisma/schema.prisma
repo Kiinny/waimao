@@ -136,6 +136,8 @@ model User {
   notifications      Notification[]
   uploadedFiles      FileAsset[]         @relation("FileUploader")
   purchaseOverrides  SalesOrder[]        @relation("OrderPurchaseOverrideActor")
+  approvedQuotes     Quote[]             @relation("QuoteApprover")
+  verifiedPayments   Payment[]           @relation("PaymentVerifier")
 
   @@index([status, deletedAt])
 }
@@ -253,26 +255,26 @@ model Customer {
 }
 
 model Contact {
-  id           String    @id @default(uuid()) @db.Uuid
-  customerId   String    @db.Uuid
-  firstName    String
-  lastName     String
-  title        String?
-  email        String?
-  phone        String?
-  whatsapp     String?
-  wechat       String?
+  id               String     @id @default(uuid()) @db.Uuid
+  customerId       String     @db.Uuid
+  firstName        String
+  lastName         String
+  title            String?
+  email            String?
+  phone            String?
+  whatsapp         String?
+  wechat           String?
   preferredChannel String?
-  isPrimary    Boolean   @default(false)
-  language     String    @default("en")
-  timezone     String?
-  decisionRole String?
-  version      Int       @default(1)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-  customer     Customer  @relation(fields: [customerId], references: [id])
-  followUps    FollowUp[]
+  isPrimary        Boolean    @default(false)
+  language         String     @default("en")
+  timezone         String?
+  decisionRole     String?
+  version          Int        @default(1)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
+  customer         Customer   @relation(fields: [customerId], references: [id])
+  followUps        FollowUp[]
 
   @@index([customerId, deletedAt])
   @@index([email])
@@ -372,44 +374,56 @@ model ProductCategory {
 }
 
 model Product {
-  id               String            @id @default(uuid()) @db.Uuid
-  sku              String            @unique
-  name             String
-  description      String?
-  categoryId       String            @db.Uuid
-  brand            String?
-  model            String?
-  specifications   Json?
-  serialized       Boolean           @default(true)
-  status           RecordStatus      @default(ACTIVE)
-  version          Int               @default(1)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  deletedAt        DateTime?
-  category         ProductCategory   @relation(fields: [categoryId], references: [id])
-  variants         ProductVariant[]
-  quoteItems       QuoteItem[]
-  orderItems       SalesOrderItem[]
-  supplierProducts SupplierProduct[]
-  inventoryItems   InventoryItem[]
+  id                    String            @id @default(uuid()) @db.Uuid
+  sku                   String            @unique
+  name                  String
+  description           String?
+  categoryId            String            @db.Uuid
+  brand                 String?
+  model                 String?
+  condition             String            @default("NEW")
+  baseModel             String?
+  specifications        Json?
+  referencePrice        Decimal?          @db.Decimal(19, 4)
+  referenceCurrencyCode String?
+  dimensions            Json?
+  hsCode                String?
+  exportControlRisk     String            @default("LOW")
+  media                 Json?
+  availability          String            @default("AVAILABLE")
+  serialized            Boolean           @default(true)
+  status                RecordStatus      @default(ACTIVE)
+  version               Int               @default(1)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  deletedAt             DateTime?
+  category              ProductCategory   @relation(fields: [categoryId], references: [id])
+  variants              ProductVariant[]
+  quoteItems            QuoteItem[]
+  orderItems            SalesOrderItem[]
+  supplierProducts      SupplierProduct[]
+  inventoryItems        InventoryItem[]
 
   @@index([categoryId, status, deletedAt])
 }
 
 model ProductVariant {
-  id            String    @id @default(uuid()) @db.Uuid
-  productId     String    @db.Uuid
-  sku           String    @unique
-  name          String
-  configuration Json
-  cost          Decimal?  @db.Decimal(19, 4)
-  currencyCode  String?
-  version       Int       @default(1)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
-  product       Product   @relation(fields: [productId], references: [id])
+  id                   String    @id @default(uuid()) @db.Uuid
+  productId            String    @db.Uuid
+  sku                  String    @unique
+  name                 String
+  configurationVersion Int       @default(1)
+  configuration        Json
+  specifications       Json?
+  cost                 Decimal?  @db.Decimal(19, 4)
+  currencyCode         String?
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+  product              Product   @relation(fields: [productId], references: [id])
 
+  @@unique([productId, configurationVersion])
   @@index([productId, deletedAt])
 }
 
@@ -422,6 +436,9 @@ model Quote {
   status         QuoteStatus    @default(DRAFT)
   currentVersion Int            @default(1)
   validUntil     DateTime?
+  approvedById   String?        @db.Uuid
+  approvedAt     DateTime?
+  approvalNote   String?
   version        Int            @default(1)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -429,38 +446,48 @@ model Quote {
   customer       Customer       @relation(fields: [customerId], references: [id])
   opportunity    Opportunity?   @relation(fields: [opportunityId], references: [id])
   owner          User           @relation("QuoteOwner", fields: [ownerId], references: [id])
+  approvedBy     User?          @relation("QuoteApprover", fields: [approvedById], references: [id], onDelete: Restrict)
   versions       QuoteVersion[]
   order          SalesOrder?
 
   @@index([ownerId, status, deletedAt])
   @@index([customerId])
+  @@index([approvedById])
 }
 
 model QuoteVersion {
-  id                String      @id @default(uuid()) @db.Uuid
-  quoteId           String      @db.Uuid
-  number            Int
-  currencyCode      String
-  exchangeRateToUsd Decimal     @db.Decimal(24, 12)
-  subtotal          Decimal     @db.Decimal(19, 4)
-  shipping          Decimal     @default(0) @db.Decimal(19, 4)
-  insurance         Decimal     @default(0) @db.Decimal(19, 4)
-  tax               Decimal     @default(0) @db.Decimal(19, 4)
-  bankFees          Decimal     @default(0) @db.Decimal(19, 4)
-  total             Decimal     @db.Decimal(19, 4)
-  totalUsd          Decimal     @db.Decimal(19, 4)
-  incoterm          String?
-  paymentTerms      String?
-  deliveryTerms     String?
-  warrantyTerms     String?
-  remarks           String?
-  immutableAt       DateTime?
-  createdAt         DateTime    @default(now())
-  quote             Quote       @relation(fields: [quoteId], references: [id])
-  items             QuoteItem[]
+  id                     String         @id @default(uuid()) @db.Uuid
+  quoteId                String         @db.Uuid
+  number                 Int
+  sourceVersionId        String?        @db.Uuid
+  currencyCode           String
+  exchangeRateToUsd      Decimal        @db.Decimal(24, 12)
+  subtotal               Decimal        @db.Decimal(19, 4)
+  shipping               Decimal        @default(0) @db.Decimal(19, 4)
+  insurance              Decimal        @default(0) @db.Decimal(19, 4)
+  tax                    Decimal        @default(0) @db.Decimal(19, 4)
+  bankFees               Decimal        @default(0) @db.Decimal(19, 4)
+  total                  Decimal        @db.Decimal(19, 4)
+  totalUsd               Decimal        @db.Decimal(19, 4)
+  estimatedCostUsd       Decimal        @default(0) @db.Decimal(19, 4)
+  estimatedProfitUsd     Decimal        @default(0) @db.Decimal(19, 4)
+  estimatedMarginPercent Decimal        @default(0) @db.Decimal(19, 4)
+  incoterm               String?
+  paymentTerms           String?
+  deliveryTerms          String?
+  warrantyTerms          String?
+  remarks                String?
+  immutableAt            DateTime?
+  createdAt              DateTime       @default(now())
+  quote                  Quote          @relation(fields: [quoteId], references: [id])
+  sourceVersion          QuoteVersion?  @relation("QuoteVersionRevision", fields: [sourceVersionId], references: [id], onDelete: Restrict)
+  revisions              QuoteVersion[] @relation("QuoteVersionRevision")
+  items                  QuoteItem[]
+  orders                 SalesOrder[]   @relation("AcceptedQuoteVersion")
 
   @@unique([quoteId, number])
   @@index([quoteId, createdAt])
+  @@index([sourceVersionId])
 }
 
 model QuoteItem {
@@ -486,6 +513,7 @@ model SalesOrder {
   orderNumber             String             @unique
   customerId              String             @db.Uuid
   quoteId                 String?            @unique @db.Uuid
+  acceptedQuoteVersionId  String?            @unique @db.Uuid
   ownerId                 String             @db.Uuid
   status                  OrderStatus        @default(DRAFT)
   currencyCode            String
@@ -493,6 +521,18 @@ model SalesOrder {
   total                   Decimal            @db.Decimal(19, 4)
   totalUsd                Decimal            @db.Decimal(19, 4)
   paymentTerms            String
+  paymentStatus           String             @default("UNPAID")
+  purchaseStatus          String             @default("NOT_STARTED")
+  inspectionStatus        String             @default("NOT_STARTED")
+  packingStatus           String             @default("NOT_STARTED")
+  shipmentStatus          String             @default("NOT_STARTED")
+  purchaseEligibilityFlag Boolean            @default(false)
+  revenueUsd              Decimal            @default(0) @db.Decimal(19, 4)
+  estimatedCostUsd        Decimal            @default(0) @db.Decimal(19, 4)
+  actualCostUsd           Decimal            @default(0) @db.Decimal(19, 4)
+  grossProfitUsd          Decimal            @default(0) @db.Decimal(19, 4)
+  grossMarginPercent      Decimal            @default(0) @db.Decimal(19, 4)
+  netProfitEstimateUsd    Decimal            @default(0) @db.Decimal(19, 4)
   purchaseOverrideReason  String?
   purchaseOverrideActorId String?            @db.Uuid
   purchaseOverrideAuditId String?            @unique @db.Uuid
@@ -503,6 +543,7 @@ model SalesOrder {
   deletedAt               DateTime?
   customer                Customer           @relation(fields: [customerId], references: [id])
   quote                   Quote?             @relation(fields: [quoteId], references: [id])
+  acceptedQuoteVersion    QuoteVersion?      @relation("AcceptedQuoteVersion", fields: [acceptedQuoteVersionId], references: [id], onDelete: Restrict)
   owner                   User               @relation("OrderOwner", fields: [ownerId], references: [id])
   purchaseOverrideActor   User?              @relation("OrderPurchaseOverrideActor", fields: [purchaseOverrideActorId], references: [id], onDelete: Restrict)
   purchaseOverrideAudit   AuditLog?          @relation("OrderPurchaseOverrideAudit", fields: [purchaseOverrideAuditId], references: [id], onDelete: Restrict)
@@ -545,15 +586,21 @@ model Payment {
   currencyCode      String
   exchangeRateToUsd Decimal       @db.Decimal(24, 12)
   amountUsd         Decimal       @db.Decimal(19, 4)
+  proofMetadata     Json?
+  verifiedById      String?       @db.Uuid
+  verifiedAt        DateTime?
+  rejectionReason   String?
   receivedAt        DateTime?
   version           Int           @default(1)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
   salesOrder        SalesOrder    @relation(fields: [salesOrderId], references: [id])
+  verifiedBy        User?         @relation("PaymentVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
   refunds           Refund[]
 
   @@index([salesOrderId, status, deletedAt])
+  @@index([verifiedById])
 }
 
 model Refund {

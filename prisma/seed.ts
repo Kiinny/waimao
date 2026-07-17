@@ -1,4 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
+import Decimal from "decimal.js";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
@@ -45,6 +46,7 @@ const permissions = [
   "order.update",
   "payment.read",
   "payment.create",
+  "payment.verify",
   "refund.create",
   "finance.profit.read",
   "supplier.read",
@@ -468,6 +470,428 @@ async function main() {
         createdById: salesOwnerIds[index % salesOwnerIds.length],
       },
     });
+  }
+
+  const categories = [
+    ["ai-server", "AI Server"],
+    ["gpu-server", "GPU Server"],
+    ["refurbished-server", "Refurbished Server"],
+    ["server-component", "Server Component"],
+  ] as const;
+  for (const [index, [slug, name]] of categories.entries()) {
+    await prisma.productCategory.upsert({
+      where: { slug },
+      update: { name, deletedAt: null },
+      create: {
+        id: deterministicId(19, index + 1),
+        slug,
+        name,
+      },
+    });
+  }
+
+  const productNames = [
+    "Dell PowerEdge R760xa",
+    "Dell PowerEdge R750",
+    "HPE ProLiant DL380 Gen11",
+    "HPE Apollo 6500 Gen10 Plus",
+    "Lenovo ThinkSystem SR675 V3",
+    "Supermicro AS-8125GS-TNHR",
+    "Supermicro SYS-421GE-TNRT",
+    "Inspur NF5488A5",
+    "Huawei FusionServer Pro 2288H V5",
+    "NVIDIA DGX H100",
+    "NVIDIA HGX H200 Platform",
+    "Dell PowerEdge XE9680",
+    "HPE ProLiant DL360 Gen10",
+    "Lenovo ThinkSystem SR650 V2",
+    "Cisco UCS C240 M6",
+    "NVIDIA L40S 48GB",
+    "NVIDIA H100 80GB",
+    "NVIDIA A100 80GB",
+    "Samsung 3.84TB NVMe SSD",
+    "Micron 64GB DDR5 RDIMM",
+  ];
+  for (let index = 0; index < 20; index += 1) {
+    const productId = deterministicId(20, index + 1);
+    const variantId = deterministicId(21, index + 1);
+    const isComponent = index >= 15;
+    const condition = index % 5 === 0 ? "REFURBISHED" : "NEW";
+    await prisma.product.upsert({
+      where: { id: productId },
+      update: {
+        sku: `ATL-${String(index + 1).padStart(3, "0")}`,
+        name: productNames[index],
+        categoryId: deterministicId(19, isComponent ? 4 : (index % 3) + 1),
+        condition,
+        baseModel: productNames[index],
+        specifications: isComponent
+          ? { interface: index < 18 ? "PCIe" : "Server component" }
+          : { cpu: "2 x Intel Xeon", memory: "512GB", gpuSlots: 4 },
+        referencePrice: String(5_000 + index * 2_500),
+        referenceCurrencyCode: "USD",
+        dimensions: isComponent
+          ? { lengthCm: 30, widthCm: 12, heightCm: 5 }
+          : { lengthCm: 110, widthCm: 48.2, heightCm: 8.7 },
+        hsCode: isComponent ? "847330" : "847150",
+        exportControlRisk: index === 9 || index === 16 ? "REVIEW_REQUIRED" : "LOW",
+        media: [
+          {
+            kind: "IMAGE",
+            objectKey: `products/atl-${String(index + 1).padStart(3, "0")}/front.jpg`,
+          },
+        ],
+        availability: index % 4 === 0 ? "LIMITED" : "IN_STOCK",
+        deletedAt: null,
+      },
+      create: {
+        id: productId,
+        sku: `ATL-${String(index + 1).padStart(3, "0")}`,
+        name: productNames[index],
+        description: `${productNames[index]} export configuration`,
+        categoryId: deterministicId(19, isComponent ? 4 : (index % 3) + 1),
+        brand: productNames[index].split(" ")[0],
+        model: productNames[index],
+        condition,
+        baseModel: productNames[index],
+        specifications: isComponent
+          ? { interface: index < 18 ? "PCIe" : "Server component" }
+          : { cpu: "2 x Intel Xeon", memory: "512GB", gpuSlots: 4 },
+        referencePrice: String(5_000 + index * 2_500),
+        referenceCurrencyCode: "USD",
+        dimensions: isComponent
+          ? { lengthCm: 30, widthCm: 12, heightCm: 5 }
+          : { lengthCm: 110, widthCm: 48.2, heightCm: 8.7 },
+        hsCode: isComponent ? "847330" : "847150",
+        exportControlRisk: index === 9 || index === 16 ? "REVIEW_REQUIRED" : "LOW",
+        media: [
+          {
+            kind: "IMAGE",
+            objectKey: `products/atl-${String(index + 1).padStart(3, "0")}/front.jpg`,
+          },
+        ],
+        availability: index % 4 === 0 ? "LIMITED" : "IN_STOCK",
+        serialized: true,
+      },
+    });
+    await prisma.productVariant.upsert({
+      where: { id: variantId },
+      update: {
+        productId,
+        sku: `ATL-${String(index + 1).padStart(3, "0")}-V1`,
+        name: isComponent ? "Standard" : "Export configuration",
+        configurationVersion: 1,
+        configuration: isComponent
+          ? { grade: condition }
+          : { gpu: `${(index % 4) + 1} accelerator(s)`, ram: "512GB" },
+        specifications: { warrantyMonths: condition === "REFURBISHED" ? 6 : 12 },
+        cost: String(3_500 + index * 1_700),
+        currencyCode: "USD",
+        deletedAt: null,
+      },
+      create: {
+        id: variantId,
+        productId,
+        sku: `ATL-${String(index + 1).padStart(3, "0")}-V1`,
+        name: isComponent ? "Standard" : "Export configuration",
+        configurationVersion: 1,
+        configuration: isComponent
+          ? { grade: condition }
+          : { gpu: `${(index % 4) + 1} accelerator(s)`, ram: "512GB" },
+        specifications: { warrantyMonths: condition === "REFURBISHED" ? 6 : 12 },
+        cost: String(3_500 + index * 1_700),
+        currencyCode: "USD",
+      },
+    });
+  }
+
+  const quoteStatuses = [
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "CONVERTED",
+    "ACCEPTED",
+    "SENT",
+    "VIEWED",
+    "APPROVED",
+    "DRAFT",
+  ] as const;
+  for (let index = 0; index < 15; index += 1) {
+    const quoteId = deterministicId(30, index + 1);
+    const versionId = deterministicId(31, index + 1);
+    const itemId = deterministicId(32, index + 1);
+    const productIndex = index % 20;
+    const total = String(25_000 + index * 4_000);
+    const estimatedCost = String(17_000 + index * 2_500);
+    const estimatedProfit = String(
+      Number(total) - Number(estimatedCost),
+    );
+    const status = quoteStatuses[index];
+    const immutable = ["SENT", "VIEWED", "ACCEPTED", "CONVERTED"].includes(
+      status,
+    );
+    await prisma.quote.upsert({
+      where: { id: quoteId },
+      update: {
+        customerId: deterministicId(10, index + 1),
+        opportunityId: deterministicId(13, index + 1),
+        ownerId: salesOwnerIds[index % salesOwnerIds.length],
+        status,
+        currentVersion: 1,
+        validUntil: new Date(Date.UTC(2026, 8, index + 1)),
+        approvedById: status === "DRAFT" ? null : deterministicId(3, 2),
+        approvedAt:
+          status === "DRAFT" ? null : new Date(Date.UTC(2026, 6, 5)),
+        approvalNote: status === "DRAFT" ? null : "Commercial terms approved.",
+        deletedAt: null,
+      },
+      create: {
+        id: quoteId,
+        quoteNumber: `QUOTE-${String(index + 1).padStart(6, "0")}`,
+        customerId: deterministicId(10, index + 1),
+        opportunityId: deterministicId(13, index + 1),
+        ownerId: salesOwnerIds[index % salesOwnerIds.length],
+        status,
+        currentVersion: 1,
+        validUntil: new Date(Date.UTC(2026, 8, index + 1)),
+        approvedById: status === "DRAFT" ? null : deterministicId(3, 2),
+        approvedAt:
+          status === "DRAFT" ? null : new Date(Date.UTC(2026, 6, 5)),
+        approvalNote: status === "DRAFT" ? null : "Commercial terms approved.",
+      },
+    });
+    await prisma.quoteVersion.upsert({
+      where: { id: versionId },
+      update: {
+        quoteId,
+        number: 1,
+        currencyCode: "USD",
+        exchangeRateToUsd: "1",
+        subtotal: total,
+        shipping: "0",
+        insurance: "0",
+        tax: "0",
+        bankFees: "0",
+        total,
+        totalUsd: total,
+        estimatedCostUsd: estimatedCost,
+        estimatedProfitUsd: estimatedProfit,
+        estimatedMarginPercent: new Decimal(estimatedProfit)
+          .div(total)
+          .times(100)
+          .toFixed(4),
+        incoterm: "CIF",
+        paymentTerms: "100% T/T Before Purchase",
+        deliveryTerms: "30 days after confirmed payment",
+        warrantyTerms: "12 months",
+        remarks: "Export subject to final compliance review.",
+        immutableAt: immutable
+          ? new Date(Date.UTC(2026, 6, 6 + index))
+          : null,
+      },
+      create: {
+        id: versionId,
+        quoteId,
+        number: 1,
+        currencyCode: "USD",
+        exchangeRateToUsd: "1",
+        subtotal: total,
+        total,
+        totalUsd: total,
+        estimatedCostUsd: estimatedCost,
+        estimatedProfitUsd: estimatedProfit,
+        estimatedMarginPercent: new Decimal(estimatedProfit)
+          .div(total)
+          .times(100)
+          .toFixed(4),
+        incoterm: "CIF",
+        paymentTerms: "100% T/T Before Purchase",
+        deliveryTerms: "30 days after confirmed payment",
+        warrantyTerms: "12 months",
+        remarks: "Export subject to final compliance review.",
+        immutableAt: immutable
+          ? new Date(Date.UTC(2026, 6, 6 + index))
+          : null,
+      },
+    });
+    await prisma.quoteItem.upsert({
+      where: { id: itemId },
+      update: {
+        quoteVersionId: versionId,
+        productId: deterministicId(20, productIndex + 1),
+        description: productNames[productIndex],
+        configuration: {
+          variantId: deterministicId(21, productIndex + 1),
+          configurationVersion: 1,
+          sku: `ATL-${String(productIndex + 1).padStart(3, "0")}-V1`,
+        },
+        quantity: 1,
+        unitPrice: total,
+        discount: "0",
+        lineTotal: total,
+        estimatedCostUsd: estimatedCost,
+      },
+      create: {
+        id: itemId,
+        quoteVersionId: versionId,
+        productId: deterministicId(20, productIndex + 1),
+        description: productNames[productIndex],
+        configuration: {
+          variantId: deterministicId(21, productIndex + 1),
+          configurationVersion: 1,
+          sku: `ATL-${String(productIndex + 1).padStart(3, "0")}-V1`,
+        },
+        quantity: 1,
+        unitPrice: total,
+        lineTotal: total,
+        estimatedCostUsd: estimatedCost,
+      },
+    });
+
+    if (index < 10) {
+      const orderId = deterministicId(33, index + 1);
+      const orderItemId = deterministicId(34, index + 1);
+      const paymentId = deterministicId(35, index + 1);
+      const paidAmount =
+        index < 6 ? total : index < 8 ? String(Number(total) / 2) : total;
+      const paymentStatus =
+        index < 8 ? "CONFIRMED" : "PENDING";
+      await prisma.salesOrder.upsert({
+        where: { id: orderId },
+        update: {
+          customerId: deterministicId(10, index + 1),
+          quoteId,
+          acceptedQuoteVersionId: versionId,
+          ownerId: salesOwnerIds[index % salesOwnerIds.length],
+          status: index < 2 ? "PURCHASING" : "CONFIRMED",
+          currencyCode: "USD",
+          exchangeRateToUsd: "1",
+          total,
+          totalUsd: total,
+          paymentTerms: "100% T/T Before Purchase",
+          paymentStatus:
+            index < 6 ? "PAID" : index < 8 ? "PARTIALLY_PAID" : "UNPAID",
+          purchaseStatus: index < 2 ? "PURCHASING" : "NOT_STARTED",
+          purchaseEligibilityFlag: index < 6,
+          revenueUsd: total,
+          estimatedCostUsd: estimatedCost,
+          actualCostUsd: index < 2 ? estimatedCost : "0",
+          grossProfitUsd: estimatedProfit,
+          grossMarginPercent: new Decimal(estimatedProfit)
+            .div(total)
+            .times(100)
+            .toFixed(4),
+          netProfitEstimateUsd: estimatedProfit,
+          deletedAt: null,
+        },
+        create: {
+          id: orderId,
+          orderNumber: `SALES-ORDER-${String(index + 1).padStart(6, "0")}`,
+          customerId: deterministicId(10, index + 1),
+          quoteId,
+          acceptedQuoteVersionId: versionId,
+          ownerId: salesOwnerIds[index % salesOwnerIds.length],
+          status: index < 2 ? "PURCHASING" : "CONFIRMED",
+          currencyCode: "USD",
+          exchangeRateToUsd: "1",
+          total,
+          totalUsd: total,
+          paymentTerms: "100% T/T Before Purchase",
+          paymentStatus:
+            index < 6 ? "PAID" : index < 8 ? "PARTIALLY_PAID" : "UNPAID",
+          purchaseStatus: index < 2 ? "PURCHASING" : "NOT_STARTED",
+          purchaseEligibilityFlag: index < 6,
+          revenueUsd: total,
+          estimatedCostUsd: estimatedCost,
+          actualCostUsd: index < 2 ? estimatedCost : "0",
+          grossProfitUsd: estimatedProfit,
+          grossMarginPercent: new Decimal(estimatedProfit)
+            .div(total)
+            .times(100)
+            .toFixed(4),
+          netProfitEstimateUsd: estimatedProfit,
+        },
+      });
+      await prisma.salesOrderItem.upsert({
+        where: { id: orderItemId },
+        update: {
+          salesOrderId: orderId,
+          productId: deterministicId(20, productIndex + 1),
+          description: productNames[productIndex],
+          configuration: {
+            quoteVersionId: versionId,
+            variantId: deterministicId(21, productIndex + 1),
+          },
+          quantity: 1,
+          unitPrice: total,
+          lineTotal: total,
+        },
+        create: {
+          id: orderItemId,
+          salesOrderId: orderId,
+          productId: deterministicId(20, productIndex + 1),
+          description: productNames[productIndex],
+          configuration: {
+            quoteVersionId: versionId,
+            variantId: deterministicId(21, productIndex + 1),
+          },
+          quantity: 1,
+          unitPrice: total,
+          lineTotal: total,
+        },
+      });
+      await prisma.payment.upsert({
+        where: { id: paymentId },
+        update: {
+          salesOrderId: orderId,
+          reference: `TT-${String(index + 1).padStart(4, "0")}`,
+          status: paymentStatus,
+          amount: paidAmount,
+          currencyCode: "USD",
+          exchangeRateToUsd: "1",
+          amountUsd: paidAmount,
+          proofMetadata: {
+            fileName: `tt-${index + 1}.pdf`,
+            objectKey: `payments/${paymentId}/proof.pdf`,
+          },
+          verifiedById:
+            paymentStatus === "CONFIRMED" ? deterministicId(3, 5) : null,
+          verifiedAt:
+            paymentStatus === "CONFIRMED"
+              ? new Date(Date.UTC(2026, 6, 10 + index))
+              : null,
+          receivedAt: new Date(Date.UTC(2026, 6, 9 + index)),
+          deletedAt: null,
+        },
+        create: {
+          id: paymentId,
+          salesOrderId: orderId,
+          reference: `TT-${String(index + 1).padStart(4, "0")}`,
+          status: paymentStatus,
+          amount: paidAmount,
+          currencyCode: "USD",
+          exchangeRateToUsd: "1",
+          amountUsd: paidAmount,
+          proofMetadata: {
+            fileName: `tt-${index + 1}.pdf`,
+            objectKey: `payments/${paymentId}/proof.pdf`,
+          },
+          verifiedById:
+            paymentStatus === "CONFIRMED" ? deterministicId(3, 5) : null,
+          verifiedAt:
+            paymentStatus === "CONFIRMED"
+              ? new Date(Date.UTC(2026, 6, 10 + index))
+              : null,
+          receivedAt: new Date(Date.UTC(2026, 6, 9 + index)),
+        },
+      });
+    }
   }
 }
 

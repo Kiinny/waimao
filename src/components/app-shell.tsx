@@ -20,6 +20,9 @@ export function AppShell({
     ["leads", "L", dictionary.nav.leads],
     ["customers", "C", dictionary.nav.customers],
     ["opportunities", "O", dictionary.nav.opportunities],
+    ["products", "P", locale === "zh" ? "产品" : "Products"],
+    ["quotes", "Q", locale === "zh" ? "报价" : "Quotes"],
+    ["orders", "S", locale === "zh" ? "订单" : "Orders"],
     ["users", "U", dictionary.nav.users],
     ["roles", "R", dictionary.nav.roles],
   ] as const;

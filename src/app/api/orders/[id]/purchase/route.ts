@@ -73,7 +73,12 @@ export async function POST(
       if (!gate.overridden) {
         return transaction.salesOrder.update({
           where: { id },
-          data: { status: "PURCHASING", version: { increment: 1 } },
+          data: {
+            status: "PURCHASING",
+            purchaseStatus: "PURCHASING",
+            purchaseEligibilityFlag: true,
+            version: { increment: 1 },
+          },
           select: { id: true, orderNumber: true, status: true, version: true },
         });
       }
@@ -93,6 +98,8 @@ export async function POST(
         where: { id },
         data: {
           status: "PURCHASING",
+          purchaseStatus: "PURCHASING_OVERRIDE",
+          purchaseEligibilityFlag: true,
           version: { increment: 1 },
           purchaseOverrideActorId: gate.override.actorId,
           purchaseOverrideReason: gate.override.reason,
