@@ -9,6 +9,7 @@ import {
   isFollowUpOverdue,
   crmOwnerWhere,
   assertLeadMutable,
+  customerActivityWhere,
   customerTimelineWhere,
   followUpRelationMetadata,
   opportunityStageGuard,
@@ -107,6 +108,39 @@ describe("converted lead immutability", () => {
 });
 
 describe("customer relationship invariants", () => {
+  it("loads contact- and opportunity-related follow-up audits into customer activity", () => {
+    expect(
+      customerActivityWhere(
+        "customer-1",
+        ["contact-1"],
+        ["opportunity-1"],
+      ),
+    ).toEqual({
+      OR: [
+        { entityType: "Customer", entityId: "customer-1" },
+        {
+          entityType: "Contact",
+          metadata: { path: ["customerId"], equals: "customer-1" },
+        },
+        {
+          entityType: "FollowUp",
+          metadata: { path: ["customerId"], equals: "customer-1" },
+        },
+        {
+          entityType: "FollowUp",
+          metadata: { path: ["contactId"], equals: "contact-1" },
+        },
+        {
+          entityType: "FollowUp",
+          metadata: {
+            path: ["opportunityId"],
+            equals: "opportunity-1",
+          },
+        },
+      ],
+    });
+  });
+
   it("loads direct, contact, and opportunity follow-ups into the timeline", () => {
     expect(customerTimelineWhere("customer-1")).toEqual({
       deletedAt: null,

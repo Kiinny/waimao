@@ -50,6 +50,34 @@ export function customerTimelineWhere(customerId: string) {
   };
 }
 
+export function customerActivityWhere(
+  customerId: string,
+  contactIds: readonly string[],
+  opportunityIds: readonly string[],
+) {
+  return {
+    OR: [
+      { entityType: "Customer", entityId: customerId },
+      {
+        entityType: "Contact",
+        metadata: { path: ["customerId"], equals: customerId },
+      },
+      {
+        entityType: "FollowUp",
+        metadata: { path: ["customerId"], equals: customerId },
+      },
+      ...contactIds.map((contactId) => ({
+        entityType: "FollowUp",
+        metadata: { path: ["contactId"], equals: contactId },
+      })),
+      ...opportunityIds.map((opportunityId) => ({
+        entityType: "FollowUp",
+        metadata: { path: ["opportunityId"], equals: opportunityId },
+      })),
+    ],
+  };
+}
+
 export interface FollowUpRelationIds {
   customerId?: string | null;
   contactId?: string | null;

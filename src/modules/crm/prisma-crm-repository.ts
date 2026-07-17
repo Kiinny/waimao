@@ -9,6 +9,7 @@ import {
   assertLeadMutable,
   assertPrimaryContactChange,
   crmOwnerWhere,
+  customerActivityWhere,
   customerTimelineWhere,
   findLeadDuplicates,
   followUpRelationMetadata,
@@ -549,13 +550,13 @@ export class PrismaCrmRepository implements CrmRepository {
         orderBy: { createdAt: "desc" },
       }),
       prisma.auditLog.findMany({
-        where: {
-          OR: [
-            { entityType: "Customer", entityId: id },
-            { entityType: "Contact", metadata: { path: ["customerId"], equals: id } },
-            { entityType: "FollowUp", metadata: { path: ["customerId"], equals: id } },
-          ],
-        },
+        where: customerActivityWhere(
+          id,
+          customer.contacts.map(({ id: contactId }) => contactId),
+          customer.opportunities.map(
+            ({ id: opportunityId }) => opportunityId,
+          ),
+        ),
         orderBy: { createdAt: "desc" },
         take: 50,
       }),

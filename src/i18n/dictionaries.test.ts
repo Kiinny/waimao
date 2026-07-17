@@ -53,4 +53,16 @@ describe("locale dictionaries", () => {
     expect(dictionary.statuses.NEGOTIATION).toBe("\u8c08\u5224");
     expect(dictionary.channels.WECHAT).toBe("\u5fae\u4fe1");
   });
+
+  it("localizes customer follow-up creation relations in English and Chinese", () => {
+    const english = getDictionary("en").crm;
+    const chinese = getDictionary("zh").crm;
+
+    expect(english.actions.addFollowUp).toBe("Add follow-up");
+    expect(english.fields.relatedContact).toBe("Related contact");
+    expect(english.fields.relatedOpportunity).toBe("Related opportunity");
+    expect(chinese.actions.addFollowUp).toBe("\u6dfb\u52a0\u8ddf\u8fdb");
+    expect(chinese.fields.relatedContact).toBe("\u5173\u8054\u8054\u7cfb\u4eba");
+    expect(chinese.fields.relatedOpportunity).toBe("\u5173\u8054\u5546\u673a");
+  });
 });

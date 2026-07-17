@@ -98,6 +98,28 @@ Final fresh review gate:
 - `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm pnpm prisma:generate`: exit `0`; Prisma Client 7.8.0 generated.
 - `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm pnpm build`: exit `0`; Next.js 16.2.10 generated 29 routes/pages.
 
+## Final Customer Follow-up Fix
+
+- Customer detail now includes a working follow-up creation form that always relates the record to the current Customer and optionally adds one of that Customer's Contacts or Opportunities.
+- The form reuses the validated `POST /api/follow-ups` API and existing mutation component. It supports type, channel, summary, occurred time, outcome, next action, and next-action time with localized loading, success, and error feedback.
+- Customer Activity now includes FollowUp audit entries whose metadata relates through `contactId` or `opportunityId`, in addition to direct `customerId` entries.
+- English and Chinese relation labels were added.
+
+Focused red/green evidence:
+
+- Activity test RED: 1 failure, `customerActivityWhere is not a function`.
+- Activity test GREEN: 20/20 CRM domain tests passed.
+- Localization test RED: 1 failure because `relatedContact` was missing.
+- Combined focused GREEN: 2 files passed, 26 tests passed.
+
+Fresh final gate:
+
+- `npm test`: exit `0`; 17 files passed, 92 tests passed.
+- `npm run typecheck`: exit `0`.
+- `npm run lint`: exit `0`.
+- `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm npm run prisma:generate`: exit `0`; Prisma Client 7.8.0 generated.
+- `DATABASE_URL=postgresql://crm:crm@localhost:5432/crm npm run build`: exit `0`; Next.js 16.2.10 generated 29 routes/pages.
+
 ## Self-Review
 
 - Ownership is enforced twice: API permissions gate entry and repository predicates restrict identities/aggregates. Representative-supplied `ownerId` filters cannot replace the authenticated owner scope.
