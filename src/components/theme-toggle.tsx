@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-export function ThemeToggle() {
+export function ThemeToggle({ label }: { label: string }) {
   useEffect(() => {
     const enabled =
       localStorage.getItem("atlas-theme") === "dark" ||
@@ -21,7 +21,7 @@ export function ThemeToggle() {
     <button
       type="button"
       className="icon-button focus-ring"
-      aria-label="Toggle color theme"
+      aria-label={label}
       onClick={toggleTheme}
     >
       T

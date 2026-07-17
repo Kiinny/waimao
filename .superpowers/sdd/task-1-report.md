@@ -175,3 +175,47 @@ pnpm build
   ```
 
   Result: PASS — Next.js 16.2.10 compiled, typechecked and generated all 16 route entries.
+
+## Dashboard scope and accessibility re-review fixes
+
+### Fixes delivered
+
+- Dashboard service/repository contracts now receive the complete live authorization context rather than only a user ID.
+- Sales Representative dashboard customer/quote/order counts and recent-customer identities now use the same `ownerId` scope as global search. Sales Managers and wildcard administrators retain their permitted broader scope. Due-task metrics remain assignee-scoped to the current user.
+- Added localized English/Chinese accessible labels for the dashboard metrics region and theme toggle.
+
+### Exact checks and results
+
+- Focused dashboard/accessibility tests:
+
+  ```powershell
+  pnpm test src/modules/dashboard/dashboard-service.test.ts src/modules/dashboard/dashboard-scope.test.ts src/i18n/dictionaries.test.ts
+  ```
+
+  Result: PASS — 3 test files, 8 tests, 0 failures.
+
+- Focused TypeScript integration:
+
+  ```powershell
+  pnpm typecheck
+  ```
+
+  Result: PASS — `tsc --noEmit`, exit code 0.
+
+- Full unit suite:
+
+  ```powershell
+  pnpm test
+  ```
+
+  Result: PASS — 13 test files, 54 tests, 0 failures.
+
+- Full TypeScript, ESLint and production build:
+
+  ```powershell
+  pnpm typecheck
+  pnpm lint
+  pnpm build
+  ```
+
+  Result: PASS — TypeScript and ESLint exited 0; Next.js 16.2.10 compiled, typechecked and generated all 16 route entries.

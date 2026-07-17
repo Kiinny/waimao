@@ -31,6 +31,10 @@ describe("locale dictionaries", () => {
     expect(dictionary.search.entities.order).toBe("\u8ba2\u5355");
     expect(dictionary.search.entities.quote).toBe("\u62a5\u4ef7");
     expect(dictionary.signOutLabel).toBe("\u9000\u51fa\u767b\u5f55");
+    expect(dictionary.themeLabel).toBe("\u5207\u6362\u989c\u8272\u4e3b\u9898");
+    expect(dictionary.dashboard.metricsLabel).toBe(
+      "\u4e1a\u52a1\u6307\u6807",
+    );
   });
 
   it("keeps English punctuation readable", () => {

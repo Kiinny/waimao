@@ -12,12 +12,13 @@ export interface DashboardSnapshot {
 }
 
 export interface DashboardRepository {
-  loadSnapshot(userId: string): Promise<DashboardSnapshot>;
+  loadSnapshot(context: AuthorizationContext): Promise<DashboardSnapshot>;
 }
 
 export function loadDashboard(
   repository: DashboardRepository,
-  userId: string,
+  context: AuthorizationContext,
 ) {
-  return repository.loadSnapshot(userId);
+  return repository.loadSnapshot(context);
 }
+import type { AuthorizationContext } from "@/lib/rbac";

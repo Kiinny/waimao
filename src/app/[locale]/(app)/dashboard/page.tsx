@@ -21,7 +21,7 @@ export default async function DashboardPage({
   const dictionary = getDictionary(locale);
   const snapshot = await loadDashboard(
     new PrismaDashboardRepository(),
-    context.userId,
+    context,
   );
   const metrics = [
     [dictionary.dashboard.customers, snapshot.activeCustomers],
@@ -41,7 +41,10 @@ export default async function DashboardPage({
           <p>{dictionary.dashboard.subtitle}</p>
         </div>
       </header>
-      <section className="metrics" aria-label="Business metrics">
+      <section
+        className="metrics"
+        aria-label={dictionary.dashboard.metricsLabel}
+      >
         {metrics.map(([label, value]) => (
           <article className="card metric" key={label}>
             <div className="metric-label">{label}</div>

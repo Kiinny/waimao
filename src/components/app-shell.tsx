@@ -81,7 +81,7 @@ export function AppShell({
             >
               {targetDictionary.languageName}
             </Link>
-            <ThemeToggle />
+            <ThemeToggle label={dictionary.themeLabel} />
             <form action={logout}>
               <button
                 className="icon-button focus-ring"

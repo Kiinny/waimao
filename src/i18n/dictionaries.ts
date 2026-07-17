@@ -7,6 +7,7 @@ const dictionaries = {
     languageName: "English",
     languageSwitch: "Switch language",
     signOutLabel: "Sign out",
+    themeLabel: "Toggle color theme",
     notificationsLabel: "View notifications and risks",
     nav: {
       workspace: "Workspace",
@@ -33,6 +34,7 @@ const dictionaries = {
       },
     },
     dashboard: {
+      metricsLabel: "Business metrics",
       title: "Good to see you",
       subtitle: "Here is the current operating picture.",
       customers: "Active customers",
@@ -92,6 +94,7 @@ const dictionaries = {
     languageName: "\u4e2d\u6587",
     languageSwitch: "\u5207\u6362\u8bed\u8a00",
     signOutLabel: "\u9000\u51fa\u767b\u5f55",
+    themeLabel: "\u5207\u6362\u989c\u8272\u4e3b\u9898",
     notificationsLabel: "\u67e5\u770b\u901a\u77e5\u4e0e\u98ce\u9669",
     nav: {
       workspace: "\u5de5\u4f5c\u53f0",
@@ -120,6 +123,7 @@ const dictionaries = {
       },
     },
     dashboard: {
+      metricsLabel: "\u4e1a\u52a1\u6307\u6807",
       title: "\u6b22\u8fce\u56de\u6765",
       subtitle:
         "\u8fd9\u662f\u5f53\u524d\u4e1a\u52a1\u8fd0\u8425\u6982\u89c8\u3002",
