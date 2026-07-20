@@ -19,10 +19,25 @@ export interface QuoteVersionState {
 }
 
 export interface QuoteVersionChanges {
+  currencyCode?: string;
+  exchangeRateToUsd?: string;
+  shipping?: string;
+  insurance?: string;
+  tax?: string;
+  bankFees?: string;
+  incoterm?: string | null;
   remarks?: string | null;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;
   warrantyTerms?: string | null;
+  items?: Array<{
+    productId: string;
+    variantId: string;
+    description?: string;
+    quantity: number;
+    unitPrice: string;
+    discount?: string;
+  }>;
 }
 
 export interface QuoteVersionRepository {

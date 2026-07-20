@@ -99,6 +99,22 @@ describe("quotation transactions", () => {
     ).resolves.toEqual({ id: "quote-1", status: "REJECTED" });
   });
 
+  it("does not let a Sales Representative reject a pending approval", async () => {
+    const repo = repository();
+    await expect(
+      transitionQuote(
+        repo,
+        {
+          userId: "sales-1",
+          roles: ["SALES_REP"],
+          permissions: ["quote.update", "quote.approve"],
+        },
+        "quote-1",
+        "REJECTED",
+      ),
+    ).rejects.toMatchObject({ code: "PERMISSION_DENIED", status: 403 });
+  });
+
   it("creates a sequential revision copied from the immutable current version", async () => {
     const repo = repository();
     await expect(reviseQuote(repo, manager, "quote-1")).resolves.toMatchObject({

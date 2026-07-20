@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculatePaymentCoverage,
+  isFullPaymentCovered,
   validateRefund,
 } from "@/modules/payments/payment-domain";
 
@@ -36,5 +37,27 @@ describe("payment coverage", () => {
         refundAmountUsd: "0.02",
       }),
     ).toThrowError(expect.objectContaining({ code: "REFUND_EXCEEDS_PAYMENT" }));
+  });
+
+  it("preserves sub-cent precision when determining full payment", () => {
+    const coverage = calculatePaymentCoverage({
+      payments: [{ status: "CONFIRMED", amountUsd: "999.9999" }],
+      refunds: [],
+    });
+
+    expect(coverage.netPaidUsd).toBe("999.9999");
+    expect(isFullPaymentCovered(coverage.netPaidUsd, "1000")).toBe(false);
+  });
+
+  it("revokes full coverage after a fractional refund", () => {
+    const coverage = calculatePaymentCoverage({
+      payments: [{ status: "CONFIRMED", amountUsd: "1000.0000" }],
+      refunds: [
+        { refundedAt: new Date("2026-07-17"), amountUsd: "0.0001" },
+      ],
+    });
+
+    expect(coverage.netPaidUsd).toBe("999.9999");
+    expect(isFullPaymentCovered(coverage.netPaidUsd, "1000")).toBe(false);
   });
 });

@@ -367,8 +367,45 @@ th {
 
 .crm-form textarea,
 .crm-form .form-feedback,
-.crm-form .form-actions {
+.crm-form .form-actions,
+.crm-form .workflow-lines,
+.crm-form .checklist-fieldset {
   grid-column: 1 / -1;
+}
+
+.workflow-lines {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-line {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(100px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.checklist-fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.checklist-fieldset label {
+  display: flex;
+  grid-auto-flow: column;
+  align-items: center;
+}
+
+.checklist-fieldset input {
+  width: auto;
+  min-height: auto;
 }
 
 .form-feedback {
@@ -583,6 +620,84 @@ details summary {
 
 .forecast-card strong {
   font-size: 22px;
+}
+
+.view-switcher,
+.export-actions,
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-switcher a {
+  padding: 7px 10px;
+  text-transform: capitalize;
+}
+
+.export-actions {
+  justify-content: flex-end;
+  margin: 12px 0 18px;
+}
+
+.task-kanban {
+  grid-template-columns: repeat(4, minmax(240px, 1fr));
+}
+
+.task-kanban .record-card {
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+
+.task-overdue {
+  border-color: #d92d20;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(180px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.calendar-day {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 190px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.notification-unread {
+  border-left: 4px solid var(--accent);
+}
+
+.settings-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setting-editor,
+.activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.setting-editor textarea,
+.record-card pre,
+.activity-list pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 12px;
 }
 
 .bar-chart,

@@ -79,3 +79,45 @@ The focused tests cover product snapshots, decimal precision, quote calculations
 - A live PostgreSQL service was not available in this workspace, so Prisma validation/client generation and the production build were verified, but migration application and the deterministic seed were not executed against a running database.
 - The dependency-free PDF is valid and includes bilingual-mode headings and all required commercial sections, but it uses a core PDF font with ASCII fallback. Fully embedded CJK glyphs and raster product-image embedding require a Unicode font/image-capable PDF dependency or accessible media bytes; current output presents product media labels/metadata instead.
 - Browser interaction against authenticated, database-backed pages was not possible without the live database. Server compilation, route generation, validation, and domain behavior are covered by the verification above.
+
+## Review Remediation
+
+Task 3 review findings were addressed in a follow-up red-green cycle.
+
+### Explicit order cost protection
+
+- Added a dedicated order presentation boundary instead of relying on generic key-name redaction.
+- Callers without `purchase.cost.read` receive no `costs` relation, cost-record `amount`/`amountUsd`, `estimatedCostUsd`, or `actualCostUsd`.
+- Profit summary fields remain independently gated by `finance.profit.read`.
+- Added a regression test that serializes a Sales Representative response and proves the actual cost value does not occur anywhere in it.
+
+### Full-precision payment coverage
+
+- Removed the two-decimal rounding step from payment coverage used for purchase eligibility.
+- Coverage retains the maximum source precision and uses `Decimal` comparison against the full stored order total.
+- Added boundary tests for `999.9999` against `1000.0000` and for a `0.0001` refund revoking full coverage.
+
+### Revised-draft commercial editing
+
+- Expanded quotation-version PATCH validation to cover currency/rate, shipping, insurance, tax, bank fees, incoterm, terms, remarks, and multiple commercial items.
+- The server resolves every selected product variant, configuration snapshot, media/export metadata, and estimated cost. Client-supplied snapshots and costs are not trusted.
+- Draft item replacement and subtotal, total, USD total, estimated cost, profit, and margin recomputation now occur in one database transaction.
+- The update transaction rechecks immutability and conditionally claims the unlocked version before replacing snapshots. Sent and later versions remain immutable.
+- Added a complete multi-item revision editor and tests for service forwarding, API validation, editor payload construction, precision, and immutability.
+
+### Permission-derived detail controls
+
+- Quote, order, payment, refund, purchase, and product detail actions now derive visibility from the current server authorization context.
+- Sales Representatives no longer see approval or purchasing controls they cannot execute; read-only Procurement users no longer see product editing.
+- Finance controls are split by `payment.create`, `payment.verify`, and `refund.create`.
+- Pending-approval rejection now has the same Sales Manager/Super Admin backend role gate as approval.
+
+### Follow-up verification
+
+- Prisma schema validation: passed.
+- Review-focused tests: 10 files, 56 tests passed.
+- Full Vitest suite: 30 files, 151 tests passed.
+- TypeScript: passed.
+- ESLint with `--max-warnings=0`: passed.
+- Next.js production build: passed.
+- `git diff --check`: passed.

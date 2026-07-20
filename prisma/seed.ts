@@ -3,6 +3,7 @@ import Decimal from "decimal.js";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
+import { resolveSeedPassword } from "./seed-password";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -10,8 +11,6 @@ if (!connectionString) throw new Error("DATABASE_URL is required");
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
-
-const DEVELOPMENT_PASSWORD = "ChangeMe123!";
 
 const permissions = [
   "dashboard.read",
@@ -52,6 +51,7 @@ const permissions = [
   "supplier.read",
   "supplier.create",
   "supplier.update",
+  "supplier.bank.read",
   "purchase.read",
   "purchase.create",
   "purchase.update",
@@ -63,10 +63,25 @@ const permissions = [
   "shipment.read",
   "shipment.update",
   "after_sales.read",
+  "after_sales.create",
   "after_sales.update",
   "task.read",
+  "task.create",
   "task.update",
   "report.read",
+  "report.sales.read",
+  "report.collections.read",
+  "report.receivables.read",
+  "report.customers.read",
+  "report.markets.read",
+  "report.products.read",
+  "report.representatives.read",
+  "report.suppliers.read",
+  "report.purchasing.read",
+  "report.logistics.read",
+  "report.after-sales.read",
+  "report.profit.read",
+  "report.conversion.read",
   "settings.read",
   "settings.update",
   "audit.read",
@@ -85,9 +100,20 @@ const roleDefinitions = [
     description: "Sales team and commercial workflow management",
     permissions: permissions.filter(
       (code) =>
-        /^(dashboard|customer|lead|follow_up|opportunity|product|quote|order|task|report)\./.test(
+        /^(dashboard|customer|lead|follow_up|opportunity|product|quote|order|task)\./.test(
           code,
-        ) && code !== "finance.profit.read",
+        ) ||
+        [
+          "report.read",
+          "report.sales.read",
+          "report.collections.read",
+          "report.receivables.read",
+          "report.customers.read",
+          "report.markets.read",
+          "report.products.read",
+          "report.representatives.read",
+          "report.conversion.read",
+        ].includes(code),
     ),
   },
   {
@@ -98,7 +124,17 @@ const roleDefinitions = [
       (code) =>
         /^(dashboard|customer|lead|follow_up|opportunity|product|quote|order|task)\./.test(
           code,
-        ) && !code.endsWith(".delete"),
+        ) && !code.endsWith(".delete") ||
+        [
+          "report.read",
+          "report.sales.read",
+          "report.collections.read",
+          "report.receivables.read",
+          "report.customers.read",
+          "report.markets.read",
+          "report.products.read",
+          "report.representatives.read",
+        ].includes(code),
     ),
   },
   {
@@ -108,9 +144,20 @@ const roleDefinitions = [
     permissions: permissions.filter(
       (code) =>
         code === "order.read" ||
-        ["dashboard.", "payment.", "refund.", "finance.", "purchase.cost.", "report."].some(
+        ["dashboard.", "payment.", "refund.", "finance.", "purchase.cost."].some(
           (prefix) => code.startsWith(prefix),
-        ),
+        ) ||
+        [
+          "report.read",
+          "report.sales.read",
+          "report.collections.read",
+          "report.receivables.read",
+          "report.customers.read",
+          "report.markets.read",
+          "report.products.read",
+          "report.representatives.read",
+          "report.profit.read",
+        ].includes(code),
     ),
   },
   {
@@ -122,7 +169,13 @@ const roleDefinitions = [
         ["product.read", "order.read", "inventory.read"].includes(code) ||
         ["dashboard.", "supplier.", "purchase.", "task."].some((prefix) =>
           code.startsWith(prefix),
-        ),
+        ) ||
+        [
+          "report.read",
+          "report.products.read",
+          "report.suppliers.read",
+          "report.purchasing.read",
+        ].includes(code),
     ),
   },
   {
@@ -139,7 +192,8 @@ const roleDefinitions = [
           "shipment.",
           "after_sales.",
           "task.",
-        ].some((prefix) => code.startsWith(prefix)),
+        ].some((prefix) => code.startsWith(prefix)) ||
+        ["report.read", "report.logistics.read", "report.after-sales.read"].includes(code),
     ),
   },
 ] as const;
@@ -163,14 +217,13 @@ function deterministicId(group: number, index: number) {
 }
 
 async function main() {
-  const passwordHash = await hashPassword(DEVELOPMENT_PASSWORD);
+  const passwordHash = await hashPassword(resolveSeedPassword(process.env));
 
-  for (const [index, code] of permissions.entries()) {
+  for (const code of permissions) {
     await prisma.permission.upsert({
       where: { code },
       update: { name: code },
       create: {
-        id: deterministicId(1, index + 1),
         code,
         name: code,
       },
@@ -181,7 +234,6 @@ async function main() {
     where: { code: "*" },
     update: { name: "All permissions" },
     create: {
-      id: deterministicId(1, 999),
       code: "*",
       name: "All permissions",
     },
@@ -259,18 +311,54 @@ async function main() {
 
   await prisma.setting.upsert({
     where: { namespace_key: { namespace: "company", key: "profile" } },
-    update: {},
+    update: {
+      value: {
+        name: "Atlas Global Systems",
+        legalName: "Atlas Global Systems Limited",
+        registrationNumber: "HK-ATLAS-2026",
+        address: "Shenzhen / Hong Kong",
+        logoUrl: "https://atlascrm.dev/assets/logo.svg",
+        defaultLocale: "en",
+        baseCurrency: "USD",
+      },
+    },
     create: {
       id: deterministicId(4, 1),
       namespace: "company",
       key: "profile",
       value: {
         name: "Atlas Global Systems",
+        legalName: "Atlas Global Systems Limited",
+        registrationNumber: "HK-ATLAS-2026",
+        address: "Shenzhen / Hong Kong",
+        logoUrl: "https://atlascrm.dev/assets/logo.svg",
         defaultLocale: "en",
         baseCurrency: "USD",
       },
     },
   });
+
+  const practicalSettings = [
+    ["currency", "CNY", { rateToUsd: 0.139, effectiveAt: "2026-07-20T00:00:00.000Z" }],
+    ["currency", "EUR", { rateToUsd: 1.16, effectiveAt: "2026-07-20T00:00:00.000Z" }],
+    ["currency", "GBP", { rateToUsd: 1.34, effectiveAt: "2026-07-20T00:00:00.000Z" }],
+    ["tax", "defaults", { exportRatePercent: 0, domesticRatePercent: 13 }],
+    ["bank", "usd-primary", { bankName: "Atlas Trade Bank", accountName: "Atlas Global Systems Limited", bankAccountNumber: "001234567890", swift: "ATLSHKHH" }],
+    ["template", "quote", { title: "Atlas Quotation", footer: "Thank you for your business.", validityDays: 14 }],
+    ["catalog", "payment-terms", { values: ["100% T/T Before Purchase", "50% Deposit / 50% Before Shipment", "Net 30"] }],
+    ["catalog", "incoterms", { values: ["EXW", "FOB", "CIF", "DAP", "DDP"] }],
+    ["catalog", "statuses", { values: ["ACTIVE", "INACTIVE", "ARCHIVED"] }],
+    ["catalog", "categories", { values: ["Server", "GPU", "Storage", "Networking", "Parts"] }],
+    ["catalog", "sources", { values: ["REFERRAL", "WEB", "TRADE_SHOW", "OUTBOUND", "PARTNER"] }],
+    ["backup", "policy", { schedule: "0 2 * * *", retentionDays: 30 }],
+  ] as const;
+  for (const [namespace, key, value] of practicalSettings) {
+    await prisma.setting.upsert({
+      where: { namespace_key: { namespace, key } },
+      update: { value },
+      create: { namespace, key, value, isSecret: namespace === "bank" },
+    });
+  }
 
   for (const [index, key] of [
     "quote",
@@ -893,6 +981,349 @@ async function main() {
       });
     }
   }
+
+  const supplierNames = ["Shenzhen Compute Supply", "NVIDIA Channel HK", "Pacific Server Parts", "EuroRack Renewed", "Vertex Logistics Hardware"];
+  for (let index = 0; index < supplierNames.length; index += 1) {
+    const supplierId = deterministicId(40, index + 1);
+    await prisma.supplier.upsert({
+      where: { id: supplierId },
+      update: { name: supplierNames[index], status: "ACTIVE", deletedAt: null },
+      create: { id: supplierId, code: `SUP-${String(index + 1).padStart(3, "0")}`, name: supplierNames[index], countryCode: index < 3 ? "CN" : index === 3 ? "DE" : "SG", contactName: `Supplier Contact ${index + 1}`, email: `sales${index + 1}@supplier.example`, phone: `+86-755-${(5000 + index).toString()}` },
+    });
+    await prisma.supplierProduct.upsert({
+      where: {
+        supplierId_productId: {
+          supplierId,
+          productId: deterministicId(20, index + 1),
+        },
+      },
+      update: {
+        supplierSku: `SUP-${index + 1}-ATL-${String(index + 1).padStart(3, "0")}`,
+        leadTimeDays: 5 + index * 2,
+        lastCost: String(3500 + index * 1700),
+        currencyCode: "USD",
+      },
+      create: {
+        supplierId,
+        productId: deterministicId(20, index + 1),
+        supplierSku: `SUP-${index + 1}-ATL-${String(index + 1).padStart(3, "0")}`,
+        leadTimeDays: 5 + index * 2,
+        lastCost: String(3500 + index * 1700),
+        currencyCode: "USD",
+      },
+    });
+  }
+  const warehouse = await prisma.warehouse.upsert({ where: { code: "SZ-01" }, update: { name: "Shenzhen Export Warehouse", deletedAt: null }, create: { id: deterministicId(41, 1), code: "SZ-01", name: "Shenzhen Export Warehouse" } });
+  const location = await prisma.warehouseLocation.upsert({ where: { warehouseId_code: { warehouseId: warehouse.id, code: "A-01" } }, update: { name: "Inbound QC" }, create: { id: deterministicId(42, 1), warehouseId: warehouse.id, code: "A-01", name: "Inbound QC" } });
+  const seededInventorySerials: Array<{ id: string; inventoryItemId: string }> = [];
+  for (let index = 0; index < 3; index += 1) {
+    const inventoryId = deterministicId(43, index + 1);
+    await prisma.inventoryItem.upsert({
+      where: { id: inventoryId },
+      update: { quantityOnHand: 1, quantityReserved: index === 0 ? 1 : 0, deletedAt: null },
+      create: { id: inventoryId, productId: deterministicId(20, index + 1), locationId: location.id, quantityOnHand: 1, quantityReserved: index === 0 ? 1 : 0, unitCostUsd: String(3500 + index * 1700) },
+    });
+    const serial = await prisma.inventorySerial.upsert({
+      where: { serialNumber: `ATLAS-${index + 1}-0001` },
+      update: {
+        inventoryItemId: inventoryId,
+        status: index === 0 ? "RESERVED" : "AVAILABLE",
+        issuedAt: null,
+      },
+      create: {
+        id: deterministicId(47, index + 1),
+        inventoryItemId: inventoryId,
+        serialNumber: `ATLAS-${index + 1}-0001`,
+        status: index === 0 ? "RESERVED" : "AVAILABLE",
+        receivedAt: new Date(Date.UTC(2026, 6, 12)),
+      },
+    });
+    seededInventorySerials.push({ id: serial.id, inventoryItemId: inventoryId });
+    await prisma.qualityInspection.upsert({
+      where: { id: deterministicId(44, index + 1) },
+      update: {
+        inventoryItemId: inventoryId,
+        inventorySerialId: serial.id,
+        inspectorId: deterministicId(3, 7),
+        status: "PASSED",
+        checklist: { serial: true, boot: true, burnIn: true },
+        inspectedAt: new Date(Date.UTC(2026, 6, 13)),
+      },
+      create: {
+        id: deterministicId(44, index + 1),
+        inventoryItemId: inventoryId,
+        inventorySerialId: serial.id,
+        inspectorId: deterministicId(3, 7),
+        status: "PASSED",
+        checklist: { serial: true, boot: true, burnIn: true },
+        inspectedAt: new Date(Date.UTC(2026, 6, 13)),
+      },
+    });
+  }
+  for (let index = 0; index < 2; index += 1) {
+    const poId = deterministicId(45, index + 1);
+    const poItemId = deterministicId(48, index + 1);
+    await prisma.purchaseOrder.upsert({
+      where: { id: poId },
+      update: { supplierId: deterministicId(40, index + 1), salesOrderId: deterministicId(33, index + 1), status: index === 0 ? "RECEIVED" : "APPROVED", receivedAt: index === 0 ? new Date(Date.UTC(2026, 6, 12)) : null },
+      create: { id: poId, purchaseOrderNumber: `PURCHASE-ORDER-${String(index + 1).padStart(6, "0")}`, supplierId: deterministicId(40, index + 1), salesOrderId: deterministicId(33, index + 1), buyerId: deterministicId(3, 6), status: index === 0 ? "RECEIVED" : "APPROVED", currencyCode: "USD", exchangeRateToUsd: "1", total: "12000", totalUsd: "12000", expectedAt: new Date(Date.UTC(2026, 7, 1)), receivedAt: index === 0 ? new Date(Date.UTC(2026, 6, 12)) : null },
+    });
+    await prisma.purchaseOrderItem.deleteMany({
+      where: { purchaseOrderId: poId, id: { not: poItemId } },
+    });
+    await prisma.purchaseOrderItem.upsert({
+      where: { id: poItemId },
+      update: {
+        purchaseOrderId: poId,
+        salesOrderItemId: deterministicId(34, index + 1),
+        productId: deterministicId(20, index + 1),
+        description: productNames[index],
+        productSnapshot: {
+          id: deterministicId(20, index + 1),
+          sku: `ATL-${String(index + 1).padStart(3, "0")}`,
+          name: productNames[index],
+          serialized: true,
+        },
+        configurationSnapshot: {
+          variantId: deterministicId(21, index + 1),
+          configurationVersion: 1,
+        },
+        quantity: 1,
+        receivedQuantity: index === 0 ? 1 : 0,
+        unitCost: "12000",
+        lineTotal: "12000",
+      },
+      create: {
+        id: poItemId,
+        purchaseOrderId: poId,
+        salesOrderItemId: deterministicId(34, index + 1),
+        productId: deterministicId(20, index + 1),
+        description: productNames[index],
+        productSnapshot: {
+          id: deterministicId(20, index + 1),
+          sku: `ATL-${String(index + 1).padStart(3, "0")}`,
+          name: productNames[index],
+          serialized: true,
+        },
+        configurationSnapshot: {
+          variantId: deterministicId(21, index + 1),
+          configurationVersion: 1,
+        },
+        quantity: 1,
+        receivedQuantity: index === 0 ? 1 : 0,
+        unitCost: "12000",
+        lineTotal: "12000",
+      },
+    });
+    await prisma.inventoryItem.update({
+      where: { id: deterministicId(43, index + 1) },
+      data: { purchaseOrderItemId: poItemId },
+    });
+  }
+  const shipment = await prisma.shipment.upsert({
+    where: { shipmentNumber: "SHIPMENT-000001" },
+    update: {
+      status: "BOOKED",
+      method: "AIR",
+      carrier: "DHL Global Forwarding",
+      trackingNumber: "DHL-ATLAS-001",
+      origin: "Shenzhen",
+      destination: "Frankfurt",
+    },
+    create: {
+      id: deterministicId(46, 1),
+      shipmentNumber: "SHIPMENT-000001",
+      salesOrderId: deterministicId(33, 1),
+      coordinatorId: deterministicId(3, 8),
+      status: "BOOKED",
+      method: "AIR",
+      carrier: "DHL Global Forwarding",
+      trackingNumber: "DHL-ATLAS-001",
+      origin: "Shenzhen",
+      destination: "Frankfurt",
+    },
+  });
+  const shipmentItem = await prisma.shipmentItem.upsert({
+    where: {
+      shipmentId_salesOrderItemId: {
+        shipmentId: shipment.id,
+        salesOrderItemId: deterministicId(34, 1),
+      },
+    },
+    update: {
+      inventoryItemId: deterministicId(43, 1),
+      quantity: 1,
+    },
+    create: {
+      id: deterministicId(49, 1),
+      shipmentId: shipment.id,
+      salesOrderItemId: deterministicId(34, 1),
+      inventoryItemId: deterministicId(43, 1),
+      quantity: 1,
+    },
+  });
+  await prisma.shipmentSerial.upsert({
+    where: {
+      shipmentItemId_inventorySerialId: {
+        shipmentItemId: shipmentItem.id,
+        inventorySerialId: seededInventorySerials[0].id,
+      },
+    },
+    update: { status: "RESERVED", issuedAt: null, releasedAt: null },
+    create: {
+      id: deterministicId(50, 1),
+      shipmentItemId: shipmentItem.id,
+      inventorySerialId: seededInventorySerials[0].id,
+      status: "RESERVED",
+    },
+  });
+  await prisma.inventoryTransaction.upsert({
+    where: { id: deterministicId(51, 1) },
+    update: {
+      inventoryItemId: deterministicId(43, 1),
+      inventorySerialId: seededInventorySerials[0].id,
+      type: "RESERVATION",
+      quantity: 1,
+      referenceType: "Shipment",
+      referenceId: shipment.id,
+      createdById: deterministicId(3, 8),
+    },
+    create: {
+      id: deterministicId(51, 1),
+      inventoryItemId: deterministicId(43, 1),
+      inventorySerialId: seededInventorySerials[0].id,
+      type: "RESERVATION",
+      quantity: 1,
+      referenceType: "Shipment",
+      referenceId: shipment.id,
+      createdById: deterministicId(3, 8),
+    },
+  });
+  const ticketTypes = [
+    "QUALITY",
+    "DAMAGE",
+    "MISSING_ITEM",
+    "WRONG_ITEM",
+    "TECHNICAL",
+    "WARRANTY",
+    "RETURN",
+    "OTHER",
+  ];
+  for (let index = 0; index < 10; index += 1) {
+    const status = ["OPEN", "IN_PROGRESS", "WAITING_CUSTOMER", "RESOLVED", "CLOSED"][index % 5];
+    await prisma.afterSalesTicket.upsert({
+      where: { id: deterministicId(52, index + 1) },
+      update: {
+        customerId: deterministicId(10, index + 1),
+        salesOrderId: deterministicId(33, index + 1),
+        productId: deterministicId(20, (index % 5) + 1),
+        inventorySerialId: index < 3 ? deterministicId(47, index + 1) : null,
+        assignedToId: deterministicId(3, 9),
+        issueType: ticketTypes[index % ticketTypes.length],
+        priority: ["LOW", "NORMAL", "HIGH", "URGENT"][index % 4],
+        status,
+        solution: ["RESOLVED", "CLOSED"].includes(status)
+          ? "Replacement part supplied and customer acceptance recorded."
+          : null,
+        costAmount: index % 3 === 0 ? String(75 + index * 10) : null,
+        costCurrencyCode: index % 3 === 0 ? "USD" : null,
+        resolvedAt: ["RESOLVED", "CLOSED"].includes(status)
+          ? new Date(Date.UTC(2026, 6, 16 + index))
+          : null,
+        closedAt: status === "CLOSED"
+          ? new Date(Date.UTC(2026, 6, 17 + index))
+          : null,
+        deletedAt: null,
+      },
+      create: {
+        id: deterministicId(52, index + 1),
+        ticketNumber: `TICKET-${String(index + 1).padStart(6, "0")}`,
+        customerId: deterministicId(10, index + 1),
+        salesOrderId: deterministicId(33, index + 1),
+        productId: deterministicId(20, (index % 5) + 1),
+        inventorySerialId: index < 3 ? deterministicId(47, index + 1) : null,
+        assignedToId: deterministicId(3, 9),
+        subject: `After-sales case ${index + 1}`,
+        description: "Customer reported an issue requiring support follow-up.",
+        issueType: ticketTypes[index % ticketTypes.length],
+        priority: ["LOW", "NORMAL", "HIGH", "URGENT"][index % 4],
+        status,
+        solution: ["RESOLVED", "CLOSED"].includes(status)
+          ? "Replacement part supplied and customer acceptance recorded."
+          : null,
+        costAmount: index % 3 === 0 ? String(75 + index * 10) : null,
+        costCurrencyCode: index % 3 === 0 ? "USD" : null,
+        attachments: [],
+        resolvedAt: ["RESOLVED", "CLOSED"].includes(status)
+          ? new Date(Date.UTC(2026, 6, 16 + index))
+          : null,
+        closedAt: status === "CLOSED"
+          ? new Date(Date.UTC(2026, 6, 17 + index))
+          : null,
+      },
+    });
+  }
+  for (let index = 0; index < 20; index += 1) {
+    const status = ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"][index % 4] as
+      | "OPEN"
+      | "IN_PROGRESS"
+      | "COMPLETED"
+      | "CANCELLED";
+    const assigneeId = deterministicId(3, (index % 8) + 2);
+    const teamCode = users[(index % 8) + 1][2];
+    await prisma.task.upsert({
+      where: { id: deterministicId(53, index + 1) },
+      update: {
+        title: `Operations task ${index + 1}`,
+        status,
+        priority: ["LOW", "NORMAL", "HIGH", "URGENT"][index % 4],
+        dueAt: new Date(Date.UTC(2026, 6, 15 + index)),
+        reminderAt: new Date(Date.UTC(2026, 6, 14 + index)),
+        assigneeId,
+        creatorId: deterministicId(3, 2),
+        teamCode,
+        entityType: index % 2 ? "Customer" : "AfterSalesTicket",
+        entityId: index % 2
+          ? deterministicId(10, (index % 20) + 1)
+          : deterministicId(52, (index % 10) + 1),
+        completedAt: status === "COMPLETED"
+          ? new Date(Date.UTC(2026, 6, 16 + index))
+          : null,
+        deletedAt: null,
+      },
+      create: {
+        id: deterministicId(53, index + 1),
+        title: `Operations task ${index + 1}`,
+        description: "Seeded personal/team action with a practical related record.",
+        status,
+        priority: ["LOW", "NORMAL", "HIGH", "URGENT"][index % 4],
+        dueAt: new Date(Date.UTC(2026, 6, 15 + index)),
+        reminderAt: new Date(Date.UTC(2026, 6, 14 + index)),
+        assigneeId,
+        creatorId: deterministicId(3, 2),
+        teamCode,
+        entityType: index % 2 ? "Customer" : "AfterSalesTicket",
+        entityId: index % 2
+          ? deterministicId(10, (index % 20) + 1)
+          : deterministicId(52, (index % 10) + 1),
+        completedAt: status === "COMPLETED"
+          ? new Date(Date.UTC(2026, 6, 16 + index))
+          : null,
+      },
+    });
+  }
+  await prisma.sequence.updateMany({
+    where: { key: "ticket", nextValue: { lt: 11 } },
+    data: { nextValue: 11 },
+  });
+  await prisma.sequence.updateMany({
+    where: { key: "purchase_order", nextValue: { lt: 3 } },
+    data: { nextValue: 3 },
+  });
+  await prisma.sequence.updateMany({
+    where: { key: "shipment", nextValue: { lt: 2 } },
+    data: { nextValue: 2 },
+  });
 }
 
 main()

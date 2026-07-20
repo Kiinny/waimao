@@ -42,6 +42,46 @@ describe("quotation immutability", () => {
     expect(state.updates).toEqual([{ remarks: "Updated terms" }]);
   });
 
+  it("forwards a complete commercial draft update for server-side snapshot and total recomputation", async () => {
+    const state = repositoryFor({
+      id: "version-1",
+      quoteStatus: "DRAFT",
+      immutableAt: null,
+      quoteOwnerId: "sales-1",
+    });
+    const changes = {
+      currencyCode: "EUR",
+      exchangeRateToUsd: "1.125",
+      shipping: "100.005",
+      insurance: "25.005",
+      tax: "12.3456",
+      bankFees: "5.0001",
+      incoterm: "CIF",
+      paymentTerms: "100% T/T Before Purchase",
+      deliveryTerms: "30 days",
+      warrantyTerms: "12 months",
+      remarks: "Revised configuration",
+      items: [
+        {
+          productId: "00000000-0000-4000-8000-000000000001",
+          variantId: "00000000-0000-4000-8000-000000000002",
+          quantity: 2,
+          unitPrice: "1000.0001",
+          discount: "0.0001",
+        },
+      ],
+    };
+
+    await updateQuoteVersion(
+      state.repository,
+      salesRep,
+      "version-1",
+      changes,
+    );
+
+    expect(state.updates).toEqual([changes]);
+  });
+
   it.each(["SENT", "VIEWED", "ACCEPTED", "REJECTED", "EXPIRED", "CONVERTED"])(
     "rejects changes when a quotation is %s",
     async (quoteStatus) => {

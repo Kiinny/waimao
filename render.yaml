@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: atlas-crm
+    runtime: node
+    plan: free
+    buildCommand: pnpm install --frozen-lockfile && pnpm prisma:generate && pnpm build
+    startCommand: pnpm prisma migrate deploy && pnpm start --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AUTH_URL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: MINIO_ENDPOINT
+        sync: false
+      - key: MINIO_PORT
+        sync: false
+      - key: MINIO_ACCESS_KEY
+        sync: false
+      - key: MINIO_SECRET_KEY
+        sync: false
+      - key: MINIO_BUCKET
+        value: atlas-crm
+      - key: MINIO_USE_SSL
+        value: "true"

@@ -8,8 +8,13 @@ import type { AuthorizationContext } from "@/lib/rbac";
 import { hasGlobalOwnershipScope } from "@/lib/rbac";
 import { redactFinancialFields } from "@/modules/finance/field-redaction";
 import { calculateOrderFinancials } from "@/modules/finance/order-financials";
+import { presentOrderDetail } from "@/modules/finance/order-presentation";
 import { assertOrderTransition } from "@/modules/orders/order-domain";
-import { calculatePaymentCoverage, validateRefund } from "@/modules/payments/payment-domain";
+import {
+  calculatePaymentCoverage,
+  isFullPaymentCovered,
+  validateRefund,
+} from "@/modules/payments/payment-domain";
 import {
   assertQuoteTransition,
   calculateQuoteVersion,
@@ -603,7 +608,7 @@ export class PrismaTransactionsRepository implements TransactionRepository {
           salesOrderId: order.id,
         },
       });
-      return redactFinancialFields(order, context);
+      return presentOrderDetail(order, context);
     });
   }
 
@@ -617,7 +622,7 @@ export class PrismaTransactionsRepository implements TransactionRepository {
         payments: { where: { deletedAt: null } },
         refunds: { where: { deletedAt: null } },
       },
-    }).then((rows) => redactFinancialFields(rows, context));
+    }).then((rows) => rows.map((order) => presentOrderDetail(order, context)));
   }
 
   async getOrder(context: AuthorizationContext, id: string) {
@@ -641,7 +646,7 @@ export class PrismaTransactionsRepository implements TransactionRepository {
       estimatedCostUsd: order.estimatedCostUsd.toString(),
       actualCostsUsd: order.costs.map(({ amountUsd }) => amountUsd.toString()),
     });
-    return redactFinancialFields({ ...order, ...financials }, context);
+    return presentOrderDetail({ ...order, ...financials }, context);
   }
 
   async transitionOrder(
@@ -817,7 +822,10 @@ export class PrismaTransactionsRepository implements TransactionRepository {
         })),
       });
       const netPaid = new Decimal(coverage.netPaidUsd);
-      const fullyPaid = netPaid.gte(payment.salesOrder.totalUsd);
+      const fullyPaid = isFullPaymentCovered(
+        coverage.netPaidUsd,
+        payment.salesOrder.totalUsd.toString(),
+      );
       const eligible =
         payment.salesOrder.paymentTerms !== "100% T/T Before Purchase" ||
         fullyPaid;
@@ -908,7 +916,10 @@ export class PrismaTransactionsRepository implements TransactionRepository {
         ],
       });
       const netPaid = new Decimal(coverage.netPaidUsd);
-      const fullyPaid = netPaid.gte(payment.salesOrder.totalUsd);
+      const fullyPaid = isFullPaymentCovered(
+        coverage.netPaidUsd,
+        payment.salesOrder.totalUsd.toString(),
+      );
       const eligible =
         payment.salesOrder.paymentTerms !== "100% T/T Before Purchase" ||
         fullyPaid;

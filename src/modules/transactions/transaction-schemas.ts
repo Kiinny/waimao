@@ -10,6 +10,10 @@ const positiveMoney = money.refine(
   "Amount must be greater than zero",
 );
 const currencyCode = z.string().trim().length(3).transform((value) => value.toUpperCase());
+const exchangeRate = z
+  .string()
+  .regex(/^\d+(?:\.\d{1,12})?$/)
+  .refine((value) => Number(value) > 0, "Exchange rate must be greater than zero");
 const jsonObject = z.record(z.string(), z.json());
 
 const variantSchema = z.object({
@@ -51,12 +55,21 @@ export const productSchema = z.object({
 
 export const productUpdateSchema = productSchema.omit({ variants: true }).partial();
 
+const quoteItemSchema = z.object({
+  productId: uuid,
+  variantId: uuid,
+  description: z.string().max(1000).optional(),
+  quantity: z.number().int().positive(),
+  unitPrice: positiveMoney,
+  discount: money.optional(),
+});
+
 export const quoteSchema = z.object({
   customerId: uuid,
   opportunityId: uuid.nullable().optional(),
   validUntil: z.coerce.date().nullable().optional(),
   currencyCode,
-  exchangeRateToUsd: positiveMoney,
+  exchangeRateToUsd: exchangeRate,
   shipping: money.optional(),
   insurance: money.optional(),
   tax: money.optional(),
@@ -66,19 +79,28 @@ export const quoteSchema = z.object({
   deliveryTerms: z.string().max(1000).nullable().optional(),
   warrantyTerms: z.string().max(1000).nullable().optional(),
   remarks: z.string().max(5000).nullable().optional(),
-  items: z
-    .array(
-      z.object({
-        productId: uuid,
-        variantId: uuid,
-        description: z.string().max(1000).optional(),
-        quantity: z.number().int().positive(),
-        unitPrice: positiveMoney,
-        discount: money.optional(),
-      }),
-    )
-    .min(1),
+  items: z.array(quoteItemSchema).min(1),
 });
+
+export const quoteVersionUpdateSchema = z
+  .object({
+    currencyCode: currencyCode.optional(),
+    exchangeRateToUsd: exchangeRate.optional(),
+    shipping: money.optional(),
+    insurance: money.optional(),
+    tax: money.optional(),
+    bankFees: money.optional(),
+    incoterm: z.string().max(20).nullable().optional(),
+    paymentTerms: z.string().max(1000).nullable().optional(),
+    deliveryTerms: z.string().max(1000).nullable().optional(),
+    warrantyTerms: z.string().max(1000).nullable().optional(),
+    remarks: z.string().max(5000).nullable().optional(),
+    items: z.array(quoteItemSchema).min(1).optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input).length > 0, {
+    message: "At least one editable field is required",
+  });
 
 export const quoteTransitionSchema = z.object({
   status: z.enum([
@@ -108,7 +130,7 @@ export const paymentSchema = z.object({
   reference: z.string().max(200).nullable().optional(),
   amount: positiveMoney,
   currencyCode,
-  exchangeRateToUsd: positiveMoney,
+  exchangeRateToUsd: exchangeRate,
   receivedAt: z.coerce.date().nullable().optional(),
   proofMetadata: jsonObject,
 });
@@ -124,6 +146,6 @@ export const paymentVerificationSchema = z.discriminatedUnion("approved", [
 export const refundSchema = z.object({
   amount: positiveMoney,
   currencyCode,
-  exchangeRateToUsd: positiveMoney,
+  exchangeRateToUsd: exchangeRate,
   reason: z.string().trim().min(1).max(2000),
 });

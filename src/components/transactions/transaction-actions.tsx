@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { quoteVersionUpdatePayload } from "@/modules/quotes/quote-edit-payload";
+
 type Feedback = "idle" | "loading" | "success" | "error";
 
 async function requestJson(
@@ -94,11 +96,16 @@ function useTransactionSubmit() {
   return {
     state,
     message,
-    async submit(endpoint: string, body: unknown, successMessage: string) {
+    async submit(
+      endpoint: string,
+      body: unknown,
+      successMessage: string,
+      method: "POST" | "PATCH" = "POST",
+    ) {
       setState("loading");
       setMessage("");
       try {
-        await requestJson(endpoint, "POST", body);
+        await requestJson(endpoint, method, body);
         setState("success");
         setMessage(successMessage);
         router.refresh();
@@ -303,6 +310,172 @@ export function PaymentCreateForm({ orderId }: { orderId: string }) {
       <label>Proof file name<input name="proofFileName" required /></label>
       <label>Proof object key<input name="proofObjectKey" required /></label>
       <button className="button" disabled={action.state === "loading"} type="submit">Submit payment</button>
+      <FeedbackText message={action.message} state={action.state} />
+    </form>
+  );
+}
+
+interface QuoteEditorConfiguration {
+  id: string;
+  productId: string;
+  label: string;
+}
+
+interface QuoteEditorItem {
+  productId: string;
+  variantId: string;
+  description: string;
+  quantity: number;
+  unitPrice: string;
+  discount: string;
+}
+
+export function QuoteVersionEditForm({
+  versionId,
+  configurations,
+  initial,
+}: {
+  versionId: string;
+  configurations: QuoteEditorConfiguration[];
+  initial: {
+    currencyCode: string;
+    exchangeRateToUsd: string;
+    shipping: string;
+    insurance: string;
+    tax: string;
+    bankFees: string;
+    incoterm: string;
+    paymentTerms: string;
+    deliveryTerms: string;
+    warrantyTerms: string;
+    remarks: string;
+    items: QuoteEditorItem[];
+  };
+}) {
+  const action = useTransactionSubmit();
+  const [rows, setRows] = useState(
+    initial.items.map((item, rowId) => ({ ...item, rowId })),
+  );
+  const [nextRow, setNextRow] = useState(initial.items.length);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const items = rows.map((row) => {
+      const variantId = String(data.get(`variantId_${row.rowId}`) ?? "");
+      const configuration = configurations.find(({ id }) => id === variantId);
+      if (!configuration) {
+        throw new Error("Select a configuration for every item");
+      }
+      return {
+        productId: configuration.productId,
+        variantId,
+        description:
+          String(data.get(`description_${row.rowId}`) ?? "").trim() ||
+          undefined,
+        quantity: Number(data.get(`quantity_${row.rowId}`)),
+        unitPrice: String(data.get(`unitPrice_${row.rowId}`) ?? ""),
+        discount: String(data.get(`discount_${row.rowId}`) ?? "0"),
+      };
+    });
+    const payload = quoteVersionUpdatePayload({
+      currencyCode: String(data.get("currencyCode") ?? ""),
+      exchangeRateToUsd: String(data.get("exchangeRateToUsd") ?? ""),
+      shipping: String(data.get("shipping") ?? "0"),
+      insurance: String(data.get("insurance") ?? "0"),
+      tax: String(data.get("tax") ?? "0"),
+      bankFees: String(data.get("bankFees") ?? "0"),
+      incoterm: String(data.get("incoterm") ?? "").trim() || null,
+      paymentTerms: String(data.get("paymentTerms") ?? "").trim() || null,
+      deliveryTerms: String(data.get("deliveryTerms") ?? "").trim() || null,
+      warrantyTerms: String(data.get("warrantyTerms") ?? "").trim() || null,
+      remarks: String(data.get("remarks") ?? "").trim() || null,
+      items,
+    });
+    await action.submit(
+      `/api/quotes/versions/${versionId}`,
+      payload,
+      "Draft snapshot and totals updated",
+      "PATCH",
+    );
+  }
+
+  return (
+    <form className="crm-form" onSubmit={submit}>
+      {rows.map((row, index) => (
+        <fieldset className="card" key={row.rowId}>
+          <legend>Item {index + 1}</legend>
+          <label>
+            Configuration
+            <select
+              defaultValue={row.variantId}
+              name={`variantId_${row.rowId}`}
+              required
+            >
+              <option value="">Select</option>
+              {configurations.map((configuration) => (
+                <option key={configuration.id} value={configuration.id}>
+                  {configuration.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>Description<input defaultValue={row.description} name={`description_${row.rowId}`} /></label>
+          <label>Quantity<input defaultValue={row.quantity} min="1" name={`quantity_${row.rowId}`} required type="number" /></label>
+          <label>Unit price<input defaultValue={row.unitPrice} min="0.0001" name={`unitPrice_${row.rowId}`} required step="0.0001" type="number" /></label>
+          <label>Discount<input defaultValue={row.discount} min="0" name={`discount_${row.rowId}`} required step="0.0001" type="number" /></label>
+          {rows.length > 1 ? (
+            <button
+              className="button button-secondary"
+              onClick={() =>
+                setRows((current) =>
+                  current.filter(({ rowId }) => rowId !== row.rowId),
+                )
+              }
+              type="button"
+            >
+              Remove item
+            </button>
+          ) : null}
+        </fieldset>
+      ))}
+      <button
+        className="button button-secondary"
+        onClick={() => {
+          const first = configurations[0];
+          if (!first) return;
+          setRows((current) => [
+            ...current,
+            {
+              rowId: nextRow,
+              productId: first.productId,
+              variantId: first.id,
+              description: "",
+              quantity: 1,
+              unitPrice: "0.0001",
+              discount: "0",
+            },
+          ]);
+          setNextRow((current) => current + 1);
+        }}
+        type="button"
+      >
+        Add item
+      </button>
+      <label>Currency<input defaultValue={initial.currencyCode} maxLength={3} name="currencyCode" required /></label>
+      <label>Rate to USD<input defaultValue={initial.exchangeRateToUsd} min="0.000000000001" name="exchangeRateToUsd" required step="0.000000000001" type="number" /></label>
+      <label>Shipping<input defaultValue={initial.shipping} min="0" name="shipping" required step="0.0001" type="number" /></label>
+      <label>Insurance<input defaultValue={initial.insurance} min="0" name="insurance" required step="0.0001" type="number" /></label>
+      <label>Tax<input defaultValue={initial.tax} min="0" name="tax" required step="0.0001" type="number" /></label>
+      <label>Bank fees<input defaultValue={initial.bankFees} min="0" name="bankFees" required step="0.0001" type="number" /></label>
+      <label>Incoterm<input defaultValue={initial.incoterm} name="incoterm" /></label>
+      <label>Payment terms<input defaultValue={initial.paymentTerms} name="paymentTerms" /></label>
+      <label>Delivery terms<input defaultValue={initial.deliveryTerms} name="deliveryTerms" /></label>
+      <label>Warranty<input defaultValue={initial.warrantyTerms} name="warrantyTerms" /></label>
+      <label>Remarks<textarea defaultValue={initial.remarks} name="remarks" /></label>
+      <button className="button" disabled={action.state === "loading"} type="submit">
+        {action.state === "loading" ? "Recalculating..." : "Save and recalculate"}
+      </button>
       <FeedbackText message={action.message} state={action.state} />
     </form>
   );

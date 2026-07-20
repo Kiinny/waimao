@@ -374,35 +374,37 @@ model ProductCategory {
 }
 
 model Product {
-  id                    String            @id @default(uuid()) @db.Uuid
-  sku                   String            @unique
+  id                    String              @id @default(uuid()) @db.Uuid
+  sku                   String              @unique
   name                  String
   description           String?
-  categoryId            String            @db.Uuid
+  categoryId            String              @db.Uuid
   brand                 String?
   model                 String?
-  condition             String            @default("NEW")
+  condition             String              @default("NEW")
   baseModel             String?
   specifications        Json?
-  referencePrice        Decimal?          @db.Decimal(19, 4)
+  referencePrice        Decimal?            @db.Decimal(19, 4)
   referenceCurrencyCode String?
   dimensions            Json?
   hsCode                String?
-  exportControlRisk     String            @default("LOW")
+  exportControlRisk     String              @default("LOW")
   media                 Json?
-  availability          String            @default("AVAILABLE")
-  serialized            Boolean           @default(true)
-  status                RecordStatus      @default(ACTIVE)
-  version               Int               @default(1)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  availability          String              @default("AVAILABLE")
+  serialized            Boolean             @default(true)
+  status                RecordStatus        @default(ACTIVE)
+  version               Int                 @default(1)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
   deletedAt             DateTime?
-  category              ProductCategory   @relation(fields: [categoryId], references: [id])
+  category              ProductCategory     @relation(fields: [categoryId], references: [id])
   variants              ProductVariant[]
   quoteItems            QuoteItem[]
   orderItems            SalesOrderItem[]
   supplierProducts      SupplierProduct[]
   inventoryItems        InventoryItem[]
+  purchaseOrderItems    PurchaseOrderItem[]
+  afterSalesTickets     AfterSalesTicket[]
 
   @@index([categoryId, status, deletedAt])
 }
@@ -644,21 +646,32 @@ model Cost {
 }
 
 model Supplier {
-  id             String            @id @default(uuid()) @db.Uuid
-  code           String            @unique
-  name           String
-  countryCode    String
-  contactName    String?
-  email          String?
-  phone          String?
-  address        Json?
-  status         RecordStatus      @default(ACTIVE)
-  version        Int               @default(1)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  deletedAt      DateTime?
-  products       SupplierProduct[]
-  purchaseOrders PurchaseOrder[]
+  id                String            @id @default(uuid()) @db.Uuid
+  code              String            @unique
+  name              String
+  countryCode       String
+  supplierType      String            @default("DISTRIBUTOR")
+  contactName       String?
+  email             String?
+  phone             String?
+  website           String?
+  taxId             String?
+  address           Json?
+  paymentTerms      String?
+  leadTimeDays      Int?
+  minimumOrderValue Decimal?          @db.Decimal(19, 4)
+  rating            Int?
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  notes             String?
+  status            RecordStatus      @default(ACTIVE)
+  version           Int               @default(1)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+  products          SupplierProduct[]
+  purchaseOrders    PurchaseOrder[]
 
   @@index([status, deletedAt])
   @@index([countryCode])
@@ -689,7 +702,14 @@ model PurchaseOrder {
   exchangeRateToUsd   Decimal             @db.Decimal(24, 12)
   total               Decimal             @db.Decimal(19, 4)
   totalUsd            Decimal             @db.Decimal(19, 4)
+  paymentTerms        String?
+  shippingTerms       String?
+  incoterm            String?
+  deliveryAddress     Json?
+  notes               String?
+  attachments         Json?
   expectedAt          DateTime?
+  receivedAt          DateTime?
   version             Int                 @default(1)
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
@@ -704,20 +724,25 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id               String          @id @default(uuid()) @db.Uuid
-  purchaseOrderId  String          @db.Uuid
-  salesOrderItemId String?         @db.Uuid
-  description      String
-  quantity         Int
-  receivedQuantity Int             @default(0)
-  unitCost         Decimal         @db.Decimal(19, 4)
-  lineTotal        Decimal         @db.Decimal(19, 4)
-  purchaseOrder    PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  salesOrderItem   SalesOrderItem? @relation(fields: [salesOrderItemId], references: [id])
-  inventoryItems   InventoryItem[]
+  id                    String          @id @default(uuid()) @db.Uuid
+  purchaseOrderId       String          @db.Uuid
+  salesOrderItemId      String?         @db.Uuid
+  productId             String?         @db.Uuid
+  description           String
+  productSnapshot       Json?
+  configurationSnapshot Json?
+  quantity              Int
+  receivedQuantity      Int             @default(0)
+  unitCost              Decimal         @db.Decimal(19, 4)
+  lineTotal             Decimal         @db.Decimal(19, 4)
+  purchaseOrder         PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  salesOrderItem        SalesOrderItem? @relation(fields: [salesOrderItemId], references: [id])
+  product               Product?        @relation(fields: [productId], references: [id])
+  inventoryItems        InventoryItem[]
 
   @@index([purchaseOrderId])
   @@index([salesOrderItemId])
+  @@index([productId])
 }
 
 model Warehouse {
@@ -765,120 +790,188 @@ model InventoryItem {
   serials             InventorySerial[]
   transactions        InventoryTransaction[]
   inspections         QualityInspection[]
+  shipmentItems       ShipmentItem[]
 
   @@unique([productId, locationId, purchaseOrderItemId])
   @@index([locationId, deletedAt])
 }
 
 model InventorySerial {
-  id              String        @id @default(uuid()) @db.Uuid
-  inventoryItemId String        @db.Uuid
-  serialNumber    String        @unique
-  status          String        @default("AVAILABLE")
+  id              String                 @id @default(uuid()) @db.Uuid
+  inventoryItemId String                 @db.Uuid
+  serialNumber    String                 @unique
+  status          String                 @default("AVAILABLE")
   receivedAt      DateTime?
   issuedAt        DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  inventoryItem   InventoryItem          @relation(fields: [inventoryItemId], references: [id])
+  inspections     QualityInspection[]
+  shipmentSerials ShipmentSerial[]
+  transactions    InventoryTransaction[]
+  afterSalesTickets AfterSalesTicket[]
 
   @@index([inventoryItemId, status])
 }
 
 model InventoryTransaction {
-  id              String                   @id @default(uuid()) @db.Uuid
-  inventoryItemId String                   @db.Uuid
-  type            InventoryTransactionType
-  quantity        Int
-  fromLocationId  String?                  @db.Uuid
-  toLocationId    String?                  @db.Uuid
-  referenceType   String?
-  referenceId     String?
-  notes           String?
-  occurredAt      DateTime                 @default(now())
-  createdById     String                   @db.Uuid
-  inventoryItem   InventoryItem            @relation(fields: [inventoryItemId], references: [id])
-  fromLocation    WarehouseLocation?       @relation("TransactionFromLocation", fields: [fromLocationId], references: [id])
-  toLocation      WarehouseLocation?       @relation("TransactionToLocation", fields: [toLocationId], references: [id])
+  id                String                   @id @default(uuid()) @db.Uuid
+  inventoryItemId   String                   @db.Uuid
+  inventorySerialId String?                  @db.Uuid
+  type              InventoryTransactionType
+  quantity          Int
+  fromLocationId    String?                  @db.Uuid
+  toLocationId      String?                  @db.Uuid
+  referenceType     String?
+  referenceId       String?
+  notes             String?
+  occurredAt        DateTime                 @default(now())
+  createdById       String                   @db.Uuid
+  inventoryItem     InventoryItem            @relation(fields: [inventoryItemId], references: [id])
+  inventorySerial   InventorySerial?         @relation(fields: [inventorySerialId], references: [id])
+  fromLocation      WarehouseLocation?       @relation("TransactionFromLocation", fields: [fromLocationId], references: [id])
+  toLocation        WarehouseLocation?       @relation("TransactionToLocation", fields: [toLocationId], references: [id])
 
   @@index([inventoryItemId, occurredAt])
+  @@index([inventorySerialId, occurredAt])
   @@index([referenceType, referenceId])
 }
 
 model QualityInspection {
-  id              String           @id @default(uuid()) @db.Uuid
-  inventoryItemId String           @db.Uuid
-  inspectorId     String           @db.Uuid
-  status          InspectionStatus @default(PENDING)
-  checklist       Json?
-  notes           String?
-  inspectedAt     DateTime?
-  version         Int              @default(1)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  inventoryItem   InventoryItem    @relation(fields: [inventoryItemId], references: [id])
-  inspector       User             @relation("InspectionInspector", fields: [inspectorId], references: [id])
+  id                String           @id @default(uuid()) @db.Uuid
+  inventoryItemId   String           @db.Uuid
+  inventorySerialId String?          @db.Uuid
+  inspectorId       String           @db.Uuid
+  status            InspectionStatus @default(PENDING)
+  checklist         Json?
+  notes             String?
+  inspectedAt       DateTime?
+  version           Int              @default(1)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  inventoryItem     InventoryItem    @relation(fields: [inventoryItemId], references: [id])
+  inventorySerial   InventorySerial? @relation(fields: [inventorySerialId], references: [id])
+  inspector         User             @relation("InspectionInspector", fields: [inspectorId], references: [id])
 
   @@index([inventoryItemId, status])
+  @@index([inventorySerialId, status])
 }
 
 model Shipment {
-  id             String         @id @default(uuid()) @db.Uuid
-  shipmentNumber String         @unique
-  salesOrderId   String         @db.Uuid
-  coordinatorId  String         @db.Uuid
-  status         ShipmentStatus @default(DRAFT)
-  carrier        String?
-  trackingNumber String?
-  incoterm       String?
-  origin         String?
-  destination    String?
-  shippedAt      DateTime?
-  deliveredAt    DateTime?
-  version        Int            @default(1)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  deletedAt      DateTime?
-  salesOrder     SalesOrder     @relation(fields: [salesOrderId], references: [id])
-  coordinator    User           @relation("ShipmentCoordinator", fields: [coordinatorId], references: [id])
-  items          ShipmentItem[]
+  id                       String             @id @default(uuid()) @db.Uuid
+  shipmentNumber           String             @unique
+  salesOrderId             String             @db.Uuid
+  coordinatorId            String             @db.Uuid
+  status                   ShipmentStatus     @default(DRAFT)
+  method                   String             @default("AIR")
+  carrier                  String?
+  trackingNumber           String?
+  incoterm                 String?
+  origin                   String?
+  destination              String?
+  originPort               String?
+  destinationPort          String?
+  grossWeightKg            Decimal?           @db.Decimal(19, 4)
+  volumeCbm                Decimal?           @db.Decimal(19, 4)
+  freightCost              Decimal?           @db.Decimal(19, 4)
+  freightCurrencyCode      String?
+  freightExchangeRateToUsd Decimal?           @db.Decimal(24, 12)
+  freightCostUsd           Decimal?           @db.Decimal(19, 4)
+  estimatedDepartureAt     DateTime?
+  estimatedArrivalAt       DateTime?
+  shippedAt                DateTime?
+  deliveredAt              DateTime?
+  version                  Int                @default(1)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  deletedAt                DateTime?
+  salesOrder               SalesOrder         @relation(fields: [salesOrderId], references: [id])
+  coordinator              User               @relation("ShipmentCoordinator", fields: [coordinatorId], references: [id])
+  items                    ShipmentItem[]
+  documents                ShipmentDocument[]
 
   @@index([salesOrderId, status, deletedAt])
   @@index([trackingNumber])
 }
 
 model ShipmentItem {
-  id               String         @id @default(uuid()) @db.Uuid
-  shipmentId       String         @db.Uuid
-  salesOrderItemId String         @db.Uuid
+  id               String           @id @default(uuid()) @db.Uuid
+  shipmentId       String           @db.Uuid
+  salesOrderItemId String           @db.Uuid
+  inventoryItemId  String?          @db.Uuid
   quantity         Int
-  shipment         Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  salesOrderItem   SalesOrderItem @relation(fields: [salesOrderItemId], references: [id])
+  shipment         Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  salesOrderItem   SalesOrderItem   @relation(fields: [salesOrderItemId], references: [id])
+  inventoryItem    InventoryItem?   @relation(fields: [inventoryItemId], references: [id])
+  serials          ShipmentSerial[]
 
   @@unique([shipmentId, salesOrderItemId])
+  @@index([inventoryItemId])
+}
+
+model ShipmentSerial {
+  id                String          @id @default(uuid()) @db.Uuid
+  shipmentItemId    String          @db.Uuid
+  inventorySerialId String          @db.Uuid
+  status            String          @default("RESERVED")
+  reservedAt        DateTime        @default(now())
+  issuedAt          DateTime?
+  releasedAt        DateTime?
+  returnedAt        DateTime?
+  shipmentItem      ShipmentItem    @relation(fields: [shipmentItemId], references: [id], onDelete: Cascade)
+  inventorySerial   InventorySerial @relation(fields: [inventorySerialId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentItemId, inventorySerialId])
+  @@index([inventorySerialId, status])
+}
+
+model ShipmentDocument {
+  id           String    @id @default(uuid()) @db.Uuid
+  shipmentId   String    @db.Uuid
+  fileAssetId  String    @db.Uuid
+  documentType String
+  createdAt    DateTime  @default(now())
+  shipment     Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  fileAsset    FileAsset @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentId, fileAssetId, documentType])
+  @@index([fileAssetId])
 }
 
 model AfterSalesTicket {
-  id           String      @id @default(uuid()) @db.Uuid
-  ticketNumber String      @unique
-  customerId   String      @db.Uuid
-  salesOrderId String?     @db.Uuid
-  assignedToId String?     @db.Uuid
-  subject      String
-  description  String
-  priority     String      @default("NORMAL")
-  status       String      @default("OPEN")
-  resolution   String?
-  version      Int         @default(1)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  closedAt     DateTime?
-  deletedAt    DateTime?
-  customer     Customer    @relation(fields: [customerId], references: [id])
-  salesOrder   SalesOrder? @relation(fields: [salesOrderId], references: [id])
-  assignedTo   User?       @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  id                String           @id @default(uuid()) @db.Uuid
+  ticketNumber      String           @unique
+  customerId        String           @db.Uuid
+  salesOrderId      String?          @db.Uuid
+  productId         String?          @db.Uuid
+  inventorySerialId String?          @db.Uuid
+  assignedToId      String?          @db.Uuid
+  subject           String
+  description       String
+  issueType         String           @default("OTHER")
+  priority          String           @default("NORMAL")
+  status            String           @default("OPEN")
+  solution          String?
+  costAmount        Decimal?         @db.Decimal(19, 4)
+  costCurrencyCode  String?
+  attachments       Json?
+  version           Int              @default(1)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  deletedAt         DateTime?
+  customer          Customer         @relation(fields: [customerId], references: [id])
+  salesOrder        SalesOrder?      @relation(fields: [salesOrderId], references: [id])
+  product           Product?         @relation(fields: [productId], references: [id])
+  inventorySerial   InventorySerial? @relation(fields: [inventorySerialId], references: [id])
+  assignedTo        User?            @relation("TicketAssignee", fields: [assignedToId], references: [id])
 
   @@index([assignedToId, status, deletedAt])
   @@index([customerId])
+  @@index([salesOrderId])
+  @@index([productId])
+  @@index([inventorySerialId])
 }
 
 model Task {
@@ -888,8 +981,10 @@ model Task {
   status      TaskStatus @default(OPEN)
   priority    String     @default("NORMAL")
   dueAt       DateTime?
+  reminderAt  DateTime?
   assigneeId  String     @db.Uuid
   creatorId   String     @db.Uuid
+  teamCode    String?
   entityType  String?
   entityId    String?
   version     Int        @default(1)
@@ -905,33 +1000,38 @@ model Task {
 }
 
 model Notification {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  type      String
-  title     String
-  message   String
-  link      String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  type       String
+  title      String
+  message    String
+  link       String?
+  entityType String?
+  entityId   String?
+  dedupeKey  String?   @unique
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+  @@index([entityType, entityId])
 }
 
 model FileAsset {
-  id          String    @id @default(uuid()) @db.Uuid
-  bucket      String
-  objectKey   String    @unique
-  fileName    String
-  contentType String
-  sizeBytes   BigInt
-  checksum    String?
-  entityType  String?
-  entityId    String?
-  uploaderId  String    @db.Uuid
-  createdAt   DateTime  @default(now())
-  deletedAt   DateTime?
-  uploader    User      @relation("FileUploader", fields: [uploaderId], references: [id])
+  id                String             @id @default(uuid()) @db.Uuid
+  bucket            String
+  objectKey         String             @unique
+  fileName          String
+  contentType       String
+  sizeBytes         BigInt
+  checksum          String?
+  entityType        String?
+  entityId          String?
+  uploaderId        String             @db.Uuid
+  createdAt         DateTime           @default(now())
+  deletedAt         DateTime?
+  uploader          User               @relation("FileUploader", fields: [uploaderId], references: [id])
+  shipmentDocuments ShipmentDocument[]
 
   @@index([entityType, entityId, deletedAt])
 }

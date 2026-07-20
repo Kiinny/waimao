@@ -2,25 +2,49 @@ import Decimal from "decimal.js";
 
 import { DomainError } from "@/lib/errors";
 
-function fixed(value: Decimal.Value) {
-  return new Decimal(value).toFixed(2);
+function decimalPlaces(values: string[]) {
+  return values.reduce(
+    (maximum, value) => {
+      const fraction = value.split(".")[1];
+      return Math.max(maximum, fraction?.length ?? 0);
+    },
+    0,
+  );
 }
 
 export function calculatePaymentCoverage(input: {
   payments: Array<{ status: string; amountUsd: string }>;
   refunds: Array<{ refundedAt: Date | null; amountUsd: string }>;
 }) {
-  const payments = input.payments
+  const confirmedPaymentValues = input.payments
     .filter(({ status }) => status === "CONFIRMED")
-    .reduce((sum, { amountUsd }) => sum.plus(amountUsd), new Decimal(0));
-  const refunds = input.refunds
+    .map(({ amountUsd }) => amountUsd);
+  const confirmedRefundValues = input.refunds
     .filter(({ refundedAt }) => refundedAt !== null)
-    .reduce((sum, { amountUsd }) => sum.plus(amountUsd), new Decimal(0));
+    .map(({ amountUsd }) => amountUsd);
+  const payments = confirmedPaymentValues.reduce(
+    (sum, amountUsd) => sum.plus(amountUsd),
+    new Decimal(0),
+  );
+  const refunds = confirmedRefundValues.reduce(
+    (sum, amountUsd) => sum.plus(amountUsd),
+    new Decimal(0),
+  );
+  const paymentScale = decimalPlaces(confirmedPaymentValues);
+  const refundScale = decimalPlaces(confirmedRefundValues);
+  const netScale = Math.max(paymentScale, refundScale);
   return {
-    confirmedPaymentsUsd: fixed(payments),
-    confirmedRefundsUsd: fixed(refunds),
-    netPaidUsd: fixed(payments.minus(refunds)),
+    confirmedPaymentsUsd: payments.toFixed(paymentScale),
+    confirmedRefundsUsd: refunds.toFixed(refundScale),
+    netPaidUsd: payments.minus(refunds).toFixed(netScale),
   };
+}
+
+export function isFullPaymentCovered(
+  netPaidUsd: string,
+  requiredUsd: string,
+) {
+  return new Decimal(netPaidUsd).gte(requiredUsd);
 }
 
 export function validateRefund(input: {

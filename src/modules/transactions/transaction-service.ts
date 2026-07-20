@@ -103,6 +103,10 @@ export async function transitionQuote(
     quoteId,
     "quote.update",
   );
+  if (quote.status === "PENDING_APPROVAL" && status === "REJECTED") {
+    requirePermission(context, "quote.approve", { ownerId: quote.ownerId });
+    assertQuoteApprovalRole(context.roles);
+  }
   assertQuoteTransition(quote.status, status);
   return repository.transitionQuote(context, quote, status, note?.trim());
 }

@@ -4,6 +4,7 @@ import { ApiMutationForm } from "@/components/crm/api-mutation-form";
 import { isLocale } from "@/i18n/dictionaries";
 import { currentAuthorizationContext } from "@/lib/current-user";
 import { requirePermission } from "@/lib/rbac";
+import { productDetailCapabilities } from "@/modules/transactions/detail-capabilities";
 import { PrismaTransactionsRepository } from "@/modules/transactions/prisma-transactions-repository";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function ProductDetailPage({
   requirePermission(context, "product.read");
   const product = await repository.getProduct(context, id);
   if (!product) notFound();
+  const capabilities = productDetailCapabilities(context);
   return (
     <>
       <header className="page-heading">
@@ -45,14 +47,16 @@ export default async function ProductDetailPage({
           </article>
         ))}
       </section>
-      <details className="card section-card">
-        <summary>Edit product</summary>
-        <ApiMutationForm endpoint={`/api/products/${id}`} failureMessage="Update failed" loadingLabel="Saving..." method="PATCH" submitLabel="Save" successMessage="Product updated">
-          <label>Name<input defaultValue={product.name} name="name" required /></label>
-          <label>Availability<select defaultValue={product.availability} name="availability"><option>AVAILABLE</option><option>IN_STOCK</option><option>LIMITED</option><option>ON_REQUEST</option><option>UNAVAILABLE</option></select></label>
-          <label>Export risk<select defaultValue={product.exportControlRisk} name="exportControlRisk"><option>LOW</option><option>REVIEW_REQUIRED</option><option>RESTRICTED</option></select></label>
-        </ApiMutationForm>
-      </details>
+      {capabilities.edit ? (
+        <details className="card section-card">
+          <summary>Edit product</summary>
+          <ApiMutationForm endpoint={`/api/products/${id}`} failureMessage="Update failed" loadingLabel="Saving..." method="PATCH" submitLabel="Save" successMessage="Product updated">
+            <label>Name<input defaultValue={product.name} name="name" required /></label>
+            <label>Availability<select defaultValue={product.availability} name="availability"><option>AVAILABLE</option><option>IN_STOCK</option><option>LIMITED</option><option>ON_REQUEST</option><option>UNAVAILABLE</option></select></label>
+            <label>Export risk<select defaultValue={product.exportControlRisk} name="exportControlRisk"><option>LOW</option><option>REVIEW_REQUIRED</option><option>RESTRICTED</option></select></label>
+          </ApiMutationForm>
+        </details>
+      ) : null}
     </>
   );
 }
