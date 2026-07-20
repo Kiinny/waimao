@@ -9,6 +9,11 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env.DIRECT_URL ?? env("DATABASE_URL"),
+    // `prisma generate` only reads the schema. Cloudflare's build stage does
+    // not expose runtime secrets, so keep it independent from a live database.
+    url:
+      process.env.DIRECT_URL ??
+      process.env.DATABASE_URL ??
+      "postgresql://build:build@localhost:5432/build",
   },
 });
